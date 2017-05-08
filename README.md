@@ -1,10 +1,10 @@
 # Peisik
 
-Peisik is a statically-typed procedural verbose slightly-pure programming language. On the current language spectrum, it falls somewhere between Excel cells and BASIC. It is a safe language - no actor, malicious or not, can achieve anything useful with it. The runtime, however, might not be safe.
+Peisik is a statically-typed procedural verbose slightly-pure programming language. On the current language spectrum, it falls somewhere between Excel cells and BASIC. It is a safe language - no actor, malicious or not, can achieve anything useful with it. (The runtime, however, might not be safe.)
 
-This implementation compiles Peisik into custom bytecode which is then interpreted. The compiler is implemented in C# and the interpreter in C++.
+For an example, see the [MonteCarloPi benchmark](PeisikEndToEndTests/PerformanceSuite/MonteCarloPi.peisik).
 
-This has been my tiny programming project and therefore purposefully simple. This could provide a nice starting point for implementing an optimizing compiler -- or just a more useful language.
+This implementation compiles Peisik into custom bytecode which is then interpreted. The compiler is implemented in C# and the interpreter in C++. This has been my tiny programming project and therefore purposefully simple. It could provide a nice starting point for implementing an optimizing compiler -- or just a more useful language.
 
 ## Features
 - A verbose syntax designed to put off users

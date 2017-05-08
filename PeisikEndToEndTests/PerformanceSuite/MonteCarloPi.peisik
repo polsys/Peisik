@@ -1,0 +1,51 @@
+# This program computes the approximate value of Pi using the Monte Carlo method.
+# Assume a square centered at origin with side length 2 and area 4.
+# Within the square there is a circle with radius 1 and area equal to Pi.
+# Randomly choosing points in the square, Pi/4 of them fall within the circle.
+
+# As a benchmark, this stresses mostly internal calls, push/pop operations and loop ops.
+# It is one of the more balanced benchmarks.
+
+# Implements a simple linear congruential random number generator.
+# The generating relation is 1234567x + 987654321 (mod 2^32)
+private int RandomNext(int seed)
+begin
+    return +(*(1234567, seed), 987654321)
+end
+
+private real RandomToDouble(int seed)
+begin
+    return /(%(seed, 4294967296), 4294967296)
+end
+
+# Returns the distance from origin
+private real Dist(real x, real y)
+begin
+    return +(*(x, x), *(y, y))
+end
+
+private int Iterations 500000
+
+public real Main()
+begin
+    int hits 0
+    int i 0
+    int seed 45678
+
+    while <(i, Iterations)
+    begin
+        seed = RandomNext(seed)
+        real x RandomToDouble(seed)
+        seed = RandomNext(seed)
+        real y RandomToDouble(seed)
+
+        if <(Dist(x, y), 1)
+        begin
+            hits = +(hits, 1)
+        end
+
+        i = +(i, 1)
+    end
+
+    return *(/(hits, Iterations), 4.0)
+end

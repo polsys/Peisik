@@ -1,0 +1,19 @@
+# This program computes an arithmetic sum using recursion.
+# The execution is ordered so that tail call optimization may not occur.
+
+# As a benchmark, this stresses function calls.
+# As the interpreter stack is implemented on heap, it grows very deep during the execution.
+
+private int Count(int n)
+begin
+    if <(n, 1)
+    begin
+        return 0
+    end
+    return +(Count(-(n,1)), n)
+end
+
+public int Main()
+begin
+    return Count(2000000)
+end

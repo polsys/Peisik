@@ -1,0 +1,41 @@
+# A simple unit test library
+
+public void AssertTrue(bool condition)
+begin
+    if condition
+    begin
+        return void
+    end
+    else
+    begin
+        Print(false, true)
+        FailFast()
+    end
+end
+
+public void AssertFalse(bool condition)
+begin
+    if condition
+    begin
+        Print(true, false)
+        FailFast()
+    end
+end
+
+public void AssertInt(int actual, int expected)
+begin
+    if !=(actual, expected)
+    begin
+        Print(actual, expected)
+        FailFast()
+    end
+end
+
+public void AssertReal(real actual, real expected, real epsilon)
+begin
+    if >(Math.Abs(-(actual, expected)), epsilon)
+    begin
+        Print(actual, expected)
+        FailFast()
+    end
+end

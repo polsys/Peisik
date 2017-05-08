@@ -1,0 +1,82 @@
+# This program computes sines and cosines using the Taylor series approximation.
+# For verification, it computes (sin x)^2 + (cos x)^2 for each tested x and outputs the final sum.
+
+# As a benchmark, this stresses mostly internal math calls, push/pop operations and loop ops.
+# It is one of the more balanced benchmarks.
+
+private int MaxAngle 40000
+private int Fact2 2
+private int Fact3 6
+private int Fact4 24
+private int Fact5 120
+private int Fact6 720
+private int Fact7 5040
+private int Fact8 40320
+private int Fact9 362880
+private int Fact10 3628800
+private int Fact11 39916800
+
+private real pow(real value, int exponent)
+begin
+    int i 0
+    real result 1
+    
+    while <(i, exponent)
+    begin
+        result = *(result, value)
+        i = +(i, 1)
+    end
+    
+    return result
+end
+
+private real sin(real x)
+begin
+    # x - x^3/3! + x^5/5! - x^7/7! + x^9/9! - x^11/11!
+    real first x
+    real second /(pow(x, 3), Fact3)
+    real third /(pow(x, 5), Fact5)
+    real fourth /(pow(x, 7), Fact7)
+    real fifth /(pow(x, 9), Fact9)
+    real sixth /(pow(x, 11), Fact11)
+    
+    return -(+(-(+(-(first, second), third), fourth), fifth), sixth)
+end
+
+private real cos(real x)
+begin
+    # 1 - x^2/2! + x^4/4! - x^6/6! + x^8/8! - x^10/10!
+    real first 1
+    real second /(pow(x, 2), Fact2)
+    real third /(pow(x, 4), Fact4)
+    real fourth /(pow(x, 6), Fact6)
+    real fifth /(pow(x, 8), Fact8)
+    real sixth /(pow(x, 10), Fact10)
+    
+    return -(+(-(+(-(first, second), third), fourth), fifth), sixth)
+end
+
+private real Pi 3.14159265
+
+# x -> [-Pi, Pi]
+private real constrain(real x)
+begin
+    return -(x, *(Math.Floor(/(x, Pi)), Pi))
+end
+
+public int Main()
+begin
+    real x 0
+    real sum 0
+    
+    while <(x, MaxAngle)
+    begin
+        real angle constrain(x)
+        real value +(pow(sin(angle), 2), pow(cos(angle), 2))
+        sum = +(sum, value)
+        x = +(x, 1.0)
+    end
+    
+    # Let small rounding errors pass
+    return *(Math.Round(/(sum, 100)), 100)
+end

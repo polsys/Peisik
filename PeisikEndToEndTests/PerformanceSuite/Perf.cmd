@@ -9,8 +9,8 @@ rem TODO: Variations of this script for optimizing/non-optimizing.
 echo.
 echo COMPILER
 echo.
-peisikc Warmup BuiltinTest MonteCarloPi Trig Sum_NoTail Sum_Tail --timing
+peisikc Warmup BuiltinTest MonteCarloPi Trig Swap Fibonacci Sum_NoTail Sum_Tail --timing
 echo.
 echo INTERPRETER
 echo.
-peisik Warmup BuiltinTest MonteCarloPi Trig Sum_NoTail Sum_Tail --timing
+peisik Warmup BuiltinTest MonteCarloPi Trig Swap Fibonacci Sum_NoTail Sum_Tail --timing

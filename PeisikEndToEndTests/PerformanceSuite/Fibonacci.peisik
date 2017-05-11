@@ -1,0 +1,30 @@
+# This program computes Fibonacci numbers using the horrible recursive method.
+# It is horrible, because computing F(n) requires O(2^n) time.
+# (For practical purposes, the iterative method is a must.)
+
+# As a benchmark, this stresses mostly both types of function calls.
+
+private int Fib(int n)
+begin
+    if <=(n, 1)
+    begin
+        # Assuming that n is either 0 or 1
+        return n
+    end
+    else
+    begin
+        return +(Fib(-(n, 1)), Fib(-(n, 2)))
+    end
+end
+
+public int Main()
+begin
+    int result Fib(30)
+    
+    if !=(result, 832040)
+    begin
+        Print(result)
+        FailFast()
+    end
+    return result
+end

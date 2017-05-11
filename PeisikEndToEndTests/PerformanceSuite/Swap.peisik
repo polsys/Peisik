@@ -1,0 +1,44 @@
+# This program swaps numbers around.
+# As a benchmark, this stresses mostly local variable operations.
+
+public int Main()
+begin
+    int a 1
+    int b 2
+    int c 3
+    int d 4
+    int e 5
+    int f 6
+    int g 7
+    int h 8
+    int i 9
+    int j 10
+    
+    int iter 1000000
+    int total 0
+    
+    while >(iter, 0)
+    begin
+        int temp j
+        j = i
+        i = h
+        h = g
+        g = f
+        f = e
+        e = d
+        d = c
+        c = b
+        b = a
+        a = temp
+    
+        total = +(total, a)
+        iter = -(iter, 1)
+    end
+    
+    if !=(total, 5500000)
+    begin
+        Print(total)
+        FailFast()
+    end
+    return total
+end

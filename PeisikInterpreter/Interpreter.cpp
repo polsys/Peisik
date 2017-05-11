@@ -188,6 +188,14 @@ void Interpreter::Execute()
                 callFrame.locals[i - 1] = frame.functionStack.top();
                 frame.functionStack.pop();
             }
+
+            // Optimization: If this is a tail call, turn the call into a jump by removing the current frame.
+            // Because this is implemented in the interpreter, no compiler magic is needed.
+            // On the other hand, stack traces may become more inaccurate... but they weren't exactly useful in the first place.
+            if (op.param == frame.function.GetFunctionIndex() && bytecode[frame.programCounter].op == Opcode::Return)
+            {
+                m_stack.pop();
+            }
             m_stack.push(callFrame);
             break;
         }

@@ -15,7 +15,7 @@ static void PrintObject(const PObject& object);
 
 Interpreter::Interpreter(Program program)
     : m_program(program), m_opCounts(static_cast<size_t>(Opcode::OpcodeCount), 0), m_trace(false),
-    m_shouldHalt(false)
+    m_shouldHalt(false), m_iCallParams()
 {
 }
 
@@ -174,7 +174,6 @@ void Interpreter::Execute()
                 << " " << op.param << std::endl;
         }
 
-        std::stack<PObject> iCallParams;
         switch (op.op)
         {
         case Opcode::Call:
@@ -202,22 +201,27 @@ void Interpreter::Execute()
 
         /* CALLIx cases have intentional fallthroughs */
         case Opcode::CallI7:
-            iCallParams.push(PopTop(frame.functionStack));
+            m_iCallParams.push(PopTop(frame.functionStack));
         case Opcode::CallI6:
-            iCallParams.push(PopTop(frame.functionStack));
+            m_iCallParams.push(PopTop(frame.functionStack));
         case Opcode::CallI5:
-            iCallParams.push(PopTop(frame.functionStack));
+            m_iCallParams.push(PopTop(frame.functionStack));
         case Opcode::CallI4:
-            iCallParams.push(PopTop(frame.functionStack));
+            m_iCallParams.push(PopTop(frame.functionStack));
         case Opcode::CallI3:
-            iCallParams.push(PopTop(frame.functionStack));
+            m_iCallParams.push(PopTop(frame.functionStack));
         case Opcode::CallI2:
-            iCallParams.push(PopTop(frame.functionStack));
+            m_iCallParams.push(PopTop(frame.functionStack));
         case Opcode::CallI1:
-            iCallParams.push(PopTop(frame.functionStack));
+            m_iCallParams.push(PopTop(frame.functionStack));
         case Opcode::CallI0:
         {
-            PObject callResult = DispatchInternalCall(static_cast<InternalFunction>(op.param), iCallParams);
+            PObject callResult = DispatchInternalCall(static_cast<InternalFunction>(op.param), m_iCallParams);
+            // Clean up the param stack since it is cached
+            while (!m_iCallParams.empty())
+            {
+                m_iCallParams.pop();
+            }
             if (callResult.GetType() != PrimitiveType::Void)
                 frame.functionStack.push(callResult);
             break;

@@ -45,6 +45,8 @@ namespace Peisik
             uint32_t programCounter;
         };
         std::stack<StackFrame> m_stack;
+        // Cached stack for internal call parameters
+        std::stack<PObject> m_iCallParams;
 
         PObject DispatchInternalCall(const InternalFunction funcIndex, std::stack<PObject>& params);
         StackFrame PrepareFrameForFunction(const Function& func) const;

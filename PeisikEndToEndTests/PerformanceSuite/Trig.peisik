@@ -77,6 +77,13 @@ begin
         x = +(x, 1.0)
     end
     
-    # Let small rounding errors pass
-    return *(Math.Round(/(sum, 100)), 100)
+    # Let small errors pass
+    int result *(Math.Round(/(sum, 100)), 100)
+    
+    if !=(result, MaxAngle)
+    begin
+        Print(result)
+        FailFast()
+    end
+    return result
 end

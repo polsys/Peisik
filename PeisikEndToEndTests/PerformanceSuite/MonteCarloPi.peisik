@@ -47,5 +47,12 @@ begin
         i = +(i, 1)
     end
 
-    return *(/(hits, Iterations), 4.0)
+    real result *(/(hits, Iterations), 4.0)
+    
+    if >(Math.Abs(-(result, 3.14)), 0.01)
+    begin
+        Print(result)
+        FailFast()
+    end
+    return result
 end

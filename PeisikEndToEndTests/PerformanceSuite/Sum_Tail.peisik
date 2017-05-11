@@ -16,5 +16,12 @@ end
 
 public int Main()
 begin
-    return Count(2000000, 0)
+    int result Count(2000000, 0)
+    
+    if !=(result, 2000001000000)
+    begin
+        Print(result)
+        FailFast()
+    end
+    return result
 end

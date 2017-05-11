@@ -288,7 +288,7 @@ Interpreter::StackFrame Interpreter::PrepareFrameForFunction(const Function & fu
     auto frame = StackFrame(func);
     
     // Initialize locals
-    auto localTypes = func.GetLocalTypes();
+    auto& localTypes = func.GetLocalTypes();
     frame.locals.reserve(localTypes.size());
     for (auto type : localTypes)
         frame.locals.push_back(PObject(type, 0));

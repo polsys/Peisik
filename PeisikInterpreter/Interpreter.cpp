@@ -155,7 +155,7 @@ void Interpreter::Execute()
     {
         // References to the current frame and instruction
         StackFrame& frame = m_stack.top();
-        auto bytecode = frame.function.GetBytecode();
+        auto& bytecode = frame.function.GetBytecode();
         if (frame.programCounter >= bytecode.size())
             throw InterpreterException("Out of bytecode bounds.");
         BytecodeOp op = bytecode[frame.programCounter];

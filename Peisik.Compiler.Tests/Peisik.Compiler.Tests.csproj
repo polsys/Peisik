@@ -46,6 +46,10 @@
     <Compile Include="Compiler\CompilerTests.ControlFlow.cs" />
     <Compile Include="Compiler\CompilerTests.Analysis.cs" />
     <Compile Include="Compiler\CompilerTests.SimpleModules.cs" />
+    <Compile Include="Compiler\OptimizingCompiler\CodeGeneratorPeisikTests.cs" />
+    <Compile Include="Compiler\OptimizingCompiler\LocalVariableContextTests.cs" />
+    <Compile Include="Compiler\OptimizingCompiler\SequenceExpressionTests.cs" />
+    <Compile Include="Compiler\OptimizingCompiler\FunctionTests.cs" />
     <Compile Include="Parser\ModuleParserTests.ControlFlow.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -63,5 +67,6 @@
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

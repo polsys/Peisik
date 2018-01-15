@@ -6,6 +6,8 @@ For an example, see the [MonteCarloPi benchmark](PeisikEndToEndTests/Performance
 
 This implementation compiles Peisik into custom bytecode which is then interpreted. The compiler is implemented in C# and the interpreter in C++. This has been my tiny programming project and therefore purposefully simple. It could provide a nice starting point for implementing an optimizing compiler -- or just a more useful language.
 
+_The work-in-progress optimizing compiler is in the `optimizing` branch. This work is very incomplete._
+
 ## Features
 - A verbose syntax designed to put off users
 - Strict type system with reals, integers and booleans

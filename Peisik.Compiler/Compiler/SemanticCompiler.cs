@@ -7,6 +7,7 @@ namespace Polsys.Peisik.Compiler
 {
     /// <summary>
     /// Transforms parse trees into a compiled module.
+    /// See also <see cref="Optimizing.OptimizingCompiler"/>.
     /// </summary>
     internal class SemanticCompiler
     {

@@ -47,6 +47,14 @@
     <Compile Include="Compiler\CompiledConstant.cs" />
     <Compile Include="Compiler\CompiledProgram.cs" />
     <Compile Include="Compiler\InternalFunctions.cs" />
+    <Compile Include="Compiler\Optimizing\CodeGeneratorPeisik.cs" />
+    <Compile Include="Compiler\Optimizing\Expression.cs" />
+    <Compile Include="Compiler\Optimizing\Function.cs" />
+    <Compile Include="Compiler\Optimizing\LocalVariable.cs" />
+    <Compile Include="Compiler\Optimizing\LocalVariableContext.cs" />
+    <Compile Include="Compiler\Optimizing\Optimization.cs" />
+    <Compile Include="Compiler\Optimizing\OptimizingCompiler.cs" />
+    <Compile Include="Compiler\Optimizing\SequenceExpression.cs" />
     <Compile Include="Compiler\SemanticCompiler.cs" />
     <Compile Include="Parser\AssignmentSyntax.cs" />
     <Compile Include="Parser\IfSyntax.cs" />

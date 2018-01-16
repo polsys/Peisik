@@ -46,10 +46,12 @@
     <Compile Include="Compiler\CompilerTests.ControlFlow.cs" />
     <Compile Include="Compiler\CompilerTests.Analysis.cs" />
     <Compile Include="Compiler\CompilerTests.SimpleModules.cs" />
-    <Compile Include="Compiler\OptimizingCompiler\CodeGeneratorPeisikTests.cs" />
-    <Compile Include="Compiler\OptimizingCompiler\LocalVariableContextTests.cs" />
-    <Compile Include="Compiler\OptimizingCompiler\SequenceExpressionTests.cs" />
-    <Compile Include="Compiler\OptimizingCompiler\FunctionTests.cs" />
+    <Compile Include="Compiler\Optimizing\CodeGeneratorPeisikTests.cs" />
+    <Compile Include="Compiler\Optimizing\ErrorTests.cs" />
+    <Compile Include="Compiler\Optimizing\LocalVariableContextTests.cs" />
+    <Compile Include="Compiler\Optimizing\ExpressionTreeTests.cs" />
+    <Compile Include="Compiler\Optimizing\SequenceExpressionTests.cs" />
+    <Compile Include="Compiler\Optimizing\FunctionTests.cs" />
     <Compile Include="Parser\ModuleParserTests.ControlFlow.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

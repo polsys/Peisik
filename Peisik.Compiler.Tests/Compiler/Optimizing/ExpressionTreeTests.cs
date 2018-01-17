@@ -70,5 +70,33 @@ end";
             Assert.That(ret.Value, Is.InstanceOf<LocalLoadExpression>());
             Assert.That(((LocalLoadExpression)ret.Value).Local, Is.SameAs(local));
         }
+
+        [Test]
+        public void ConstantReturning()
+        {
+            var source = @"
+private int Result 42 # Actually added to the compilation in code
+
+public int Main()
+begin
+  return Result
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            compiler.AddConstant("Result", 42L);
+            var function = Function.FromSyntax(syntax.Functions[0], compiler);
+
+            // The expression tree should be
+            // (root)
+            //   |-- Return ConstantExpression(42)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = function.ExpressionTree as SequenceExpression;
+            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)sequence.Expressions[0];
+            Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)ret.Value).Value, Is.EqualTo(42L));
+        }
     }
 }

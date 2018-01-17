@@ -62,7 +62,12 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
             else if (syntax is IdentifierSyntax identifier)
             {
-                // TODO: Constants
+                // First try loading a constant
+                // If that does not work, it must be a local
+                if (compiler.TryGetConstant(identifier.Name, out var constValue))
+                {
+                    return new ConstantExpression(constValue);
+                }
                 return new LocalLoadExpression(localContext.GetLocal(identifier.Name, identifier.Position));
             }
             else if (syntax is LiteralSyntax literal)
@@ -94,10 +99,15 @@ namespace Polsys.Peisik.Compiler.Optimizing
     {
         public object Value;
 
-        public ConstantExpression(LiteralSyntax expression, LocalVariable store = null)
+        public ConstantExpression(object value, LocalVariable store = null)
         {
-            Value = expression.Value;
+            Value = value;
             SetStore(store);
+        }
+
+        public ConstantExpression(LiteralSyntax expression, LocalVariable store = null)
+            : this(expression.Value, store)
+        {
         }
 
         public override Expression Fold(OptimizingCompiler compiler)

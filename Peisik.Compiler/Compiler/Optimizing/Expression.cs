@@ -14,7 +14,12 @@ namespace Polsys.Peisik.Compiler.Optimizing
         /// </summary>
         public LocalVariable Store;
 
-        protected void SetStore(LocalVariable newStore)
+        /// <summary>
+        /// The result type of this expression.
+        /// </summary>
+        public PrimitiveType Type = PrimitiveType.Void;
+
+        protected virtual void SetStore(LocalVariable newStore, OptimizingCompiler compiler, TokenPosition position = default)
         {
             if (Store != null)
                 Store.AssignmentCount--;
@@ -66,23 +71,29 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 // If that does not work, it must be a local
                 if (compiler.TryGetConstant(identifier.Name, out var constValue))
                 {
-                    return new ConstantExpression(constValue);
+                    return new ConstantExpression(constValue, compiler);
                 }
-                return new LocalLoadExpression(localContext.GetLocal(identifier.Name, identifier.Position));
+                return new LocalLoadExpression(localContext.GetLocal(identifier.Name, identifier.Position), compiler);
             }
             else if (syntax is LiteralSyntax literal)
             {
-                return new ConstantExpression(literal);
+                return new ConstantExpression(literal, compiler);
             }
             else if (syntax is ReturnSyntax ret)
             {
-                return new ReturnExpression(FromSyntax(ret.Expression, function, compiler, localContext));
+                // Do the return type check here instead of complicating ReturnExpression
+                var returnValue = FromSyntax(ret.Expression, function, compiler, localContext);
+                if (returnValue.Type != function.ResultValue.Type)
+                    compiler.LogError(DiagnosticCode.WrongType, ret.Position,
+                        returnValue.Type.ToString(), function.ResultValue.Type.ToString());
+
+                return new ReturnExpression(returnValue);
             }
             else if (syntax is VariableDeclarationSyntax decl)
             {
                 var local = localContext.AddLocal(decl.Name, decl.Type, decl.Position);
                 var result = FromSyntax(decl.InitialValue, function, compiler, localContext);
-                result.SetStore(local);
+                result.SetStore(local, compiler);
                 return result;
             }
             else
@@ -99,20 +110,45 @@ namespace Polsys.Peisik.Compiler.Optimizing
     {
         public object Value;
 
-        public ConstantExpression(object value, LocalVariable store = null)
+        public ConstantExpression(object value, OptimizingCompiler compiler, LocalVariable store = null, TokenPosition position = default)
         {
+            // Store the type
+            switch (value)
+            {
+                case bool b:
+                    Type = PrimitiveType.Bool;
+                    break;
+                case long l:
+                    Type = PrimitiveType.Int;
+                    break;
+                case double d:
+                    Type = PrimitiveType.Real;
+                    break;
+                default:
+                    throw new ArgumentException("Unknown constant type");
+            }
+
             Value = value;
-            SetStore(store);
+            SetStore(store, compiler, position);
         }
 
-        public ConstantExpression(LiteralSyntax expression, LocalVariable store = null)
-            : this(expression.Value, store)
+        public ConstantExpression(LiteralSyntax expression, OptimizingCompiler compiler, LocalVariable store = null)
+            : this(expression.Value, compiler, store, expression.Position)
         {
         }
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
             return this;
+        }
+
+        protected override void SetStore(LocalVariable newStore, OptimizingCompiler compiler, TokenPosition position = default)
+        {
+            // Check the type
+            if (newStore != null && Type != newStore.Type)
+                compiler.LogError(DiagnosticCode.WrongType, position, Type.ToString(), newStore.Type.ToString());
+
+            base.SetStore(newStore, compiler, position);
         }
     }
 
@@ -123,12 +159,13 @@ namespace Polsys.Peisik.Compiler.Optimizing
     {
         public LocalVariable Local;
 
-        public LocalLoadExpression(LocalVariable local, LocalVariable store = null)
+        public LocalLoadExpression(LocalVariable local, OptimizingCompiler compiler, LocalVariable store = null)
         {
             Local = local;
             Local.UseCount++;
+            Type = local.Type;
 
-            SetStore(store);
+            SetStore(store, compiler);
         }
 
         public override Expression Fold(OptimizingCompiler compiler)
@@ -143,6 +180,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 return assignment;
             }
             return null;
+        }
+
+        protected override void SetStore(LocalVariable newStore, OptimizingCompiler compiler, TokenPosition position = default)
+        {
+            if (newStore != null && newStore.Type != Type)
+                compiler.LogError(DiagnosticCode.WrongType, position, Type.ToString(), newStore.Type.ToString());
+
+            base.SetStore(newStore, compiler, position);
         }
     }
 

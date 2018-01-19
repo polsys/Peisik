@@ -15,7 +15,7 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             syntax.SetBlock(new BlockSyntax(new TokenPosition()));
             var compiler = new OptimizingCompiler(new List<ModuleSyntax>(), Optimization.None);
 
-            var function = Function.FromSyntax(syntax, compiler);
+            var function = Function.InitializeFromSyntax(syntax, compiler, "");
 
             Assert.That(function.ResultValue, Is.Not.Null);
             Assert.That(function.ResultValue.Type, Is.EqualTo(PrimitiveType.Void));
@@ -34,7 +34,7 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             syntax.AddParameter(new VariableDeclarationSyntax(new TokenPosition(), PrimitiveType.Real, "realParam"));
             var compiler = new OptimizingCompiler(new List<ModuleSyntax>(), Optimization.None);
 
-            var function = Function.FromSyntax(syntax, compiler);
+            var function = Function.InitializeFromSyntax(syntax, compiler, "");
 
             Assert.That(function.Locals, Has.Exactly(4).Items);
             Assert.That(function.Locals[0].Name, Is.EqualTo("$result"));

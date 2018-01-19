@@ -45,6 +45,24 @@ end";
         }
 
         [Test]
+        public void VariableDecl_ShadowsConstant()
+        {
+            var source = @"private bool Value true
+
+private void Stupid()
+begin
+  int value 3
+end";
+
+            (var module, var diagnostics) = ParseStringWithDiagnostics(source);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NameAlreadyDefined));
+            Assert.That(diagnostics[0].Position.LineNumber, Is.EqualTo(5));
+            Assert.That(diagnostics[0].Position.Column, Is.EqualTo(7));
+        }
+
+        [Test]
         public void VariableDecl_Void()
         {
             var source = @"private void Stupid()

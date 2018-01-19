@@ -15,7 +15,12 @@ namespace Polsys.Peisik.Compiler.Optimizing
         private Optimization _optimizationLevel;
         internal List<CompilationDiagnostic> _diagnostics;
 
-        private Dictionary<string, object> _constants;
+        /// <summary>
+        /// If onlyVisibleTo is empty, the constant is public.
+        /// If onlyVisibleTo is a module prefix, the constant is only visible to that module.
+        /// If onlyVisibleTo is ".", the constant is only visible to the main module.
+        /// </summary>
+        private Dictionary<string, (object value, string onlyVisibleTo)> _constants;
         private List<Function> _functions;
 
         public OptimizingCompiler(List<ModuleSyntax> modules, Optimization optimizationLevel)
@@ -24,7 +29,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             _optimizationLevel = optimizationLevel;
             _diagnostics = new List<CompilationDiagnostic>();
 
-            _constants = new Dictionary<string, object>();
+            _constants = new Dictionary<string, (object, string)>();
             _functions = new List<Function>();
         }
 
@@ -43,21 +48,27 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             try
             {
-                // Create expression tree for each function
-                // This also performs semantic analysis
+                // First go through all modules and add constants and functions
+                // After this pass all type information is known and functions may be referenced
                 foreach (var module in _modules)
                 {
-                    // TODO: Module name
                     foreach (var constant in module.Constants)
                     {
-                        AddConstant(constant.Name, constant.Value);
+                        AddConstant(constant.Name, module.ModuleName, constant.Visibility, constant.Value);
                     }
 
                     // TODO: Module name
                     foreach (var function in module.Functions)
                     {
-                        _functions.Add(Function.FromSyntax(function, this));
+                        _functions.Add(Function.InitializeFromSyntax(function, this, module.ModuleName));
                     }
+                }
+
+                // Compile each function
+                // Actual syntactic analysis is performed in this pass
+                foreach (var function in _functions)
+                {
+                    function.Compile();
                 }
 
                 // Ensure that there is a Main() function
@@ -82,16 +93,57 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
         }
 
-        internal void AddConstant(string name, object value)
+        internal void AddConstant(string name, string moduleName, Visibility visibility, object value)
         {
             var nameInLower = name.ToLowerInvariant();
+            if (!string.IsNullOrEmpty(moduleName))
+                nameInLower = moduleName.ToLowerInvariant() + "." + nameInLower;
 
-            _constants.Add(nameInLower, value);
+            var visibilityString = "";
+            if (visibility != Visibility.Public)
+            {
+                if (moduleName == "")
+                    visibilityString = ".";
+                else
+                    visibilityString = moduleName.ToLowerInvariant() + ".";
+            }
+
+            _constants.Add(nameInLower, (value, visibilityString));
         }
 
-        internal bool TryGetConstant(string name, out object value)
+        internal bool TryGetConstant(string name, string modulePrefix, out object value)
         {
-            return _constants.TryGetValue(name.ToLowerInvariant(), out value);
+            if (_constants.TryGetValue((modulePrefix + name).ToLowerInvariant(), out var constant))
+            {
+                if (string.IsNullOrEmpty(constant.onlyVisibleTo))
+                {
+                    // The constant is public
+                    value = constant.value;
+                    return true;
+                }
+                else
+                {
+                    if ((constant.onlyVisibleTo == "." && modulePrefix == "") ||
+                        (constant.onlyVisibleTo == modulePrefix.ToLowerInvariant()))
+                    {
+                        // The constant is private within current module
+                        value = constant.value;
+                        return true;
+                    }
+                    else
+                    {
+                        // The constant is private and not visible
+                        value = null;
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                // The constant name does not exist
+                value = null;
+                return false;
+            }
         }
     }
 }

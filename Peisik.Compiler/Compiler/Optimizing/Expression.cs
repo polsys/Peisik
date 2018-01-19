@@ -69,7 +69,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 // First try loading a constant
                 // If that does not work, it must be a local
-                if (compiler.TryGetConstant(identifier.Name, out var constValue))
+                if (compiler.TryGetConstant(identifier.Name, function.ModulePrefix, out var constValue))
                 {
                     return new ConstantExpression(constValue, compiler);
                 }

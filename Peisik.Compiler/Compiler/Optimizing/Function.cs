@@ -11,6 +11,8 @@ namespace Polsys.Peisik.Compiler.Optimizing
     {
         public string FullName;
 
+        public string ModulePrefix;
+
         public Expression ExpressionTree;
 
         public SideEffect SideEffects;
@@ -21,6 +23,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public OptimizingCompiler Compiler => _compiler;
         private OptimizingCompiler _compiler;
+        private FunctionSyntax _syntaxTree;
 
         internal Function(OptimizingCompiler compiler)
         {
@@ -28,14 +31,17 @@ namespace Polsys.Peisik.Compiler.Optimizing
         }
 
         /// <summary>
-        /// Transforms the parse tree into a compiler representation of the function.
+        /// Initializes the function object so that it may be referenced, but does not compile the function yet.
         /// </summary>
-        public static Function FromSyntax(FunctionSyntax syntaxTree, OptimizingCompiler compiler)
+        public static Function InitializeFromSyntax(FunctionSyntax syntaxTree, OptimizingCompiler compiler, string moduleName)
         {
             var function = new Function(compiler);
 
-            // TODO: Module prefix
-            function.FullName = syntaxTree.Name.ToLowerInvariant();
+            if (string.IsNullOrEmpty(moduleName))
+                function.ModulePrefix = "";
+            else
+                function.ModulePrefix = moduleName + ".";
+            function.FullName = (function.ModulePrefix + syntaxTree.Name).ToLowerInvariant();
 
             // Initialize a local for the result
             // See the doc comment on ReturnExpression for explanation
@@ -51,23 +57,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 function.Locals.Add(new LocalVariable(param.Type, param.Name.ToLowerInvariant()) { AssignmentCount = 1 });
             }
 
-            // Build the expression tree
-            function.ExpressionTree = Expression.FromSyntax(syntaxTree.CodeBlock, function,
-                compiler, new LocalVariableContext(function));
+            // Store the expression tree for later compilation
+            function._syntaxTree = syntaxTree;
 
             return function;
         }
 
         /// <summary>
-        /// Generates final code using the code generator associated with the compiler.
+        /// Actually compiles the function, performing syntactic analysis but not optimizations.
         /// </summary>
-        public void Emit(OptimizingCompiler compiler)
+        public void Compile()
         {
-            // TODO: Compute lifetimes for locals
-
-            // Emit code
+            ExpressionTree = Expression.FromSyntax(_syntaxTree.CodeBlock, this, _compiler, new LocalVariableContext(this));
         }
-
+        
         internal LocalVariable AddVariable(string debugName, PrimitiveType type)
         {
             var local = new LocalVariable(type, debugName + "$" + Locals.Count);

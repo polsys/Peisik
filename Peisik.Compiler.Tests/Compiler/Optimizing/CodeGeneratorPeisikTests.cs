@@ -13,7 +13,8 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
         {
             var syntax = ParseStringWithoutDiagnostics(source);
             var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.FromSyntax(syntax.Functions[0], compiler);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
             var codeGen = new CodeGeneratorPeisik();
 
             codeGen.CompileFunction(function);

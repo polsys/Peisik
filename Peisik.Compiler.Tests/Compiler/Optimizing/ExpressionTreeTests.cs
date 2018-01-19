@@ -11,8 +11,10 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
         {
             var syntax = ParseStringWithoutDiagnostics(source);
             var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
 
-            return Function.FromSyntax(syntax.Functions[0], compiler);
+            return function;
         }
 
         [Test]
@@ -83,8 +85,9 @@ begin
 end";
             var syntax = ParseStringWithoutDiagnostics(source);
             var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            compiler.AddConstant("Result", 42L);
-            var function = Function.FromSyntax(syntax.Functions[0], compiler);
+            compiler.AddConstant("Result", "", Visibility.Private, 42L);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
 
             // The expression tree should be
             // (root)

@@ -12,8 +12,8 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
         public void FoldSingleUseLocals_FoldsCorrectly()
         {
             var local = new LocalVariable(PrimitiveType.Int, "local");
-            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), local);
-            var ret = new ReturnExpression(new LocalLoadExpression(local));
+            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), null, local);
+            var ret = new ReturnExpression(new LocalLoadExpression(local, null));
             var sequence = new SequenceExpression();
             sequence.Expressions.Add(assign);
             sequence.Expressions.Add(ret);
@@ -37,8 +37,8 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             {
                 AssignmentCount = 1
             };
-            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), local);
-            var ret = new ReturnExpression(new LocalLoadExpression(local));
+            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), null, local);
+            var ret = new ReturnExpression(new LocalLoadExpression(local, null));
             var sequence = new SequenceExpression();
             sequence.Expressions.Add(assign);
             sequence.Expressions.Add(ret);
@@ -65,9 +65,9 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             // return 5
             var local1 = new LocalVariable(PrimitiveType.Int, "local1");
             var local2 = new LocalVariable(PrimitiveType.Int, "local2");
-            var assign1 = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), local1);
-            var assign2 = new LocalLoadExpression(local1, local2);
-            var ret = new ReturnExpression(new LocalLoadExpression(local2));
+            var assign1 = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), null, local1);
+            var assign2 = new LocalLoadExpression(local1, null, local2);
+            var ret = new ReturnExpression(new LocalLoadExpression(local2, null));
             var sequence = new SequenceExpression();
             sequence.Expressions.Add(assign1);
             sequence.Expressions.Add(assign2);
@@ -92,9 +92,9 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
         {
             var local1 = new LocalVariable(PrimitiveType.Int, "local");
             var local2 = new LocalVariable(PrimitiveType.Int, "other");
-            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), local1);
-            var assign2 = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 6), local2);
-            var ret = new ReturnExpression(new LocalLoadExpression(local1));
+            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), null, local1);
+            var assign2 = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 6), null, local2);
+            var ret = new ReturnExpression(new LocalLoadExpression(local1, null));
             var sequence = new SequenceExpression();
             sequence.Expressions.Add(assign);
             sequence.Expressions.Add(assign2);
@@ -118,8 +118,8 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             {
                 UseCount = 1
             };
-            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), local);
-            var ret = new ReturnExpression(new LocalLoadExpression(local));
+            var assign = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), null, local);
+            var ret = new ReturnExpression(new LocalLoadExpression(local, null));
             var sequence = new SequenceExpression();
             sequence.Expressions.Add(assign);
             sequence.Expressions.Add(ret);

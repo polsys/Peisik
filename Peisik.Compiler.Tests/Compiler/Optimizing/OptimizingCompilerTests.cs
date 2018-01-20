@@ -89,5 +89,69 @@ end";
             Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NameNotFound));
             Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("OtherModule.Value"));
         }
+
+        [Test]
+        public void FunctionFromOtherModule_Works()
+        {
+            var otherModule = @"
+public int Function()
+begin
+  return 2600
+end
+";
+            var mainModule = @"
+import OtherModule
+public int Main()
+begin
+  return OtherModule.Function()
+end";
+            var compiler = new OptimizingCompiler(new List<Peisik.Parser.ModuleSyntax>()
+            {
+                ModuleParser.Parse(new StringReader(mainModule), "", "").module,
+                ModuleParser.Parse(new StringReader(otherModule), "", "OtherModule").module,
+            }, Optimization.None);
+            (var program, var diagnostics) = compiler.Compile();
+
+            Assert.That(diagnostics, Is.Empty);
+            var disasm = @"Int main() [0 locals]
+Call        othermodule.function
+Return";
+            VerifyDisassembly(program.Functions[0], program, disasm);
+            var disasmForOtherFunction = @"Int othermodule.function() [0 locals]
+PushConst   $literal_2600
+Return";
+            VerifyDisassembly(program.Functions[1], program, disasmForOtherFunction);
+        }
+
+        [Test]
+        public void FunctionFromOtherModule_PrivateFails()
+        {
+            var otherModule = @"
+private int Function()
+begin
+  return 2600
+end";
+            var mainModule = @"
+import OtherModule
+public int Main()
+begin
+  return OtherModule.Function()
+end";
+            var compiler = new OptimizingCompiler(new List<Peisik.Parser.ModuleSyntax>()
+            {
+                ModuleParser.Parse(new StringReader(otherModule), "", "OtherModule").module,
+                ModuleParser.Parse(new StringReader(mainModule), "", "").module
+            }, Optimization.None);
+            (var program, var diagnostics) = compiler.Compile();
+
+            Assert.That(program, Is.Null);
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            //
+            // The old compiler returned NameIsPrivate, but this version does not.
+            // This is an acceptable regression.
+            //
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NameNotFound));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("OtherModule.Function"));
+        }
     }
 }

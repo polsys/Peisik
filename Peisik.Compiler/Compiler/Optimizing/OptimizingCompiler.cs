@@ -21,7 +21,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
         /// If onlyVisibleTo is ".", the constant is only visible to the main module.
         /// </summary>
         private Dictionary<string, (object value, string onlyVisibleTo)> _constants;
-        private List<Function> _functions;
+        /// <summary>
+        /// See <see cref="_constants"/> comment.
+        /// </summary>
+        private Dictionary<string, (Function function, string onlyVisibleTo)> _functions;
 
         public OptimizingCompiler(List<ModuleSyntax> modules, Optimization optimizationLevel)
         {
@@ -30,7 +33,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             _diagnostics = new List<CompilationDiagnostic>();
 
             _constants = new Dictionary<string, (object, string)>();
-            _functions = new List<Function>();
+            _functions = new Dictionary<string, (Function function, string onlyVisibleTo)>();
         }
 
         internal void LogError(DiagnosticCode error, TokenPosition position, string token = "", string expected = "")
@@ -60,13 +63,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     // TODO: Module name
                     foreach (var function in module.Functions)
                     {
-                        _functions.Add(Function.InitializeFromSyntax(function, this, module.ModuleName));
+                        var f = Function.InitializeFromSyntax(function, this, module.ModuleName);
+                        var onlyVisibleTo = "";
+                        if (function.Visibility == Visibility.Private)
+                        {
+                            onlyVisibleTo = module.ModuleName.ToLowerInvariant() + ".";
+                        }
+
+                        _functions.Add(f.FullName, (f, onlyVisibleTo));
                     }
                 }
 
                 // Compile each function
                 // Actual syntactic analysis is performed in this pass
-                foreach (var function in _functions)
+                foreach ((var function, _) in _functions.Values)
                 {
                     function.Compile();
                 }
@@ -78,7 +88,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 // Generate code
                 var codeGen = new CodeGeneratorPeisik();
 
-                foreach (var function in _functions)
+                foreach ((var function, _) in _functions.Values)
                 {
                     codeGen.CompileFunction(function);
                 }
@@ -113,35 +123,46 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         internal bool TryGetConstant(string name, string modulePrefix, out object value)
         {
-            if (_constants.TryGetValue((modulePrefix + name).ToLowerInvariant(), out var constant))
+            return TryGetSymbol(_constants, name, modulePrefix, out value);
+        }
+
+        internal bool TryGetFunction(string name, string modulePrefix, out Function value)
+        {
+            return TryGetSymbol(_functions, name, modulePrefix, out value);
+        }
+
+        private bool TryGetSymbol<T>(Dictionary<string, (T value, string onlyVisibleTo)> dict,
+            string name, string modulePrefix, out T value)
+        {
+            if (dict.TryGetValue((modulePrefix + name).ToLowerInvariant(), out var symbol))
             {
-                if (string.IsNullOrEmpty(constant.onlyVisibleTo))
+                if (string.IsNullOrEmpty(symbol.onlyVisibleTo))
                 {
-                    // The constant is public
-                    value = constant.value;
+                    // The symbol is public
+                    value = symbol.value;
                     return true;
                 }
                 else
                 {
-                    if ((constant.onlyVisibleTo == "." && modulePrefix == "") ||
-                        (constant.onlyVisibleTo == modulePrefix.ToLowerInvariant()))
+                    if ((symbol.onlyVisibleTo == "." && modulePrefix == "") ||
+                        (symbol.onlyVisibleTo == modulePrefix.ToLowerInvariant()))
                     {
-                        // The constant is private within current module
-                        value = constant.value;
+                        // The symbol is private within current module
+                        value = symbol.value;
                         return true;
                     }
                     else
                     {
-                        // The constant is private and not visible
-                        value = null;
+                        // The symbol is private and not visible
+                        value = default;
                         return false;
                     }
                 }
             }
             else
             {
-                // The constant name does not exist
-                value = null;
+                // The name does not exist
+                value = default;
                 return false;
             }
         }

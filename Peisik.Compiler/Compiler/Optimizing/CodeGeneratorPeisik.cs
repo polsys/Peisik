@@ -13,6 +13,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         CompiledProgram _program = new CompiledProgram();
 
         Dictionary<string, short> _constants = new Dictionary<string, short>();
+        Dictionary<string, short> _functionIndices = new Dictionary<string, short>();
 
         public CodeGeneratorPeisik()
         {
@@ -28,6 +29,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 ReturnType = function.ResultValue.Type
             };
+
+            // Assign function index for this function
+            // If this function is Main(), also set the main function index
+            var functionIndex = GetFunctionIndex(function.FullName);
+            if (function.FullName == "main")
+            {
+                _program.MainFunctionIndex = functionIndex;
+            }
 
             // Remove redundant locals
             FoldSingleUseLocals(function);
@@ -65,6 +74,9 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     if (c.Store != null)
                         EmitStore(c.Store, compiled);
                     break;
+                case FunctionCallExpression call:
+                    CompileCall(call, function, compiled);
+                    break;
                 case ReturnExpression ret:
                     CompileReturn(ret, function, compiled);
                     break;
@@ -74,6 +86,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     break;
                 default:
                     throw new NotImplementedException($"Unhandled expression type {expression}");
+            }
+        }
+
+        private void CompileCall(FunctionCallExpression call, Function function, CompiledFunction compiled)
+        {
+            // TODO: Load parameter
+
+            // Emit call
+            compiled.Bytecode.Add(new BytecodeOp(Opcode.Call, GetFunctionIndex(call.Callee.FullName)));
+
+            // If the result should be discarded, do it
+            if (call.DiscardResult && call.Type != PrimitiveType.Void)
+            {
+                compiled.Bytecode.Add(new BytecodeOp(Opcode.PopDiscard, 0));
             }
         }
 
@@ -136,6 +162,22 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 _constants.Add(constantName, index);
 
                 return index;
+            }
+        }
+
+        private short GetFunctionIndex(string fullName)
+        {
+            // Get the index if it exists
+            // Add it if it does not
+            if (_functionIndices.TryGetValue(fullName, out var index))
+            {
+                return index;
+            }
+            else
+            {
+                var count = (short)_functionIndices.Count;
+                _functionIndices.Add(fullName, count);
+                return count;
             }
         }
     }

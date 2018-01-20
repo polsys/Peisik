@@ -61,7 +61,22 @@ namespace Polsys.Peisik.Compiler.Optimizing
         public static Expression FromSyntax(SyntaxNode syntax, Function function,
             OptimizingCompiler compiler, LocalVariableContext localContext)
         {
-            if (syntax is BlockSyntax block)
+            if (syntax is AssignmentSyntax assign)
+            {
+                // First check for the assignment to const error case
+                if (compiler.TryGetConstant(assign.Target, function.ModulePrefix, out _))
+                {
+                    compiler.LogError(DiagnosticCode.MayNotAssignToConst, assign.Position, assign.Target);
+                }
+
+                // Then do the actual assignment (with implicit error checks)
+                var local = localContext.GetLocal(assign.Target, assign.Position);
+                var expr = FromSyntax(assign.Expression, function, compiler, localContext);
+                expr.SetStore(local, compiler, assign.Position);
+
+                return expr;
+            }
+            else if (syntax is BlockSyntax block)
             {
                 return new SequenceExpression(block, function, compiler, localContext);
             }
@@ -93,7 +108,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 var local = localContext.AddLocal(decl.Name, decl.Type, decl.Position);
                 var result = FromSyntax(decl.InitialValue, function, compiler, localContext);
-                result.SetStore(local, compiler);
+                result.SetStore(local, compiler, decl.Position);
                 return result;
             }
             else

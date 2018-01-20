@@ -41,6 +41,37 @@ end";
         }
 
         [Test]
+        public void LocalAssignment()
+        {
+            var source = @"
+public void Main()
+begin
+  real local 4.0
+  local = 5.0
+end";
+            var function = SingleFunctionFromSyntax(source);
+
+            Assert.That(function.Locals, Has.Exactly(2).Items);
+            var local = function.Locals[1];
+            Assert.That(local.Name, Does.StartWith("local"));
+            Assert.That(local.Type, Is.EqualTo(PrimitiveType.Real));
+
+            // The expression tree should be
+            // (root)
+            //   |-- Constant -> local
+            //   |-- Constant -> local
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = function.ExpressionTree as SequenceExpression;
+            Assert.That(sequence.Expressions, Has.Exactly(2).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ConstantExpression>());
+            Assert.That(sequence.Expressions[0].Store, Is.SameAs(local));
+
+            Assert.That(sequence.Expressions[1], Is.InstanceOf<ConstantExpression>());
+            Assert.That(sequence.Expressions[1].Store, Is.SameAs(local));
+        }
+
+        [Test]
         public void LocalReturning()
         {
             var source = @"

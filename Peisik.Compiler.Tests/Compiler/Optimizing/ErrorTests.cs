@@ -122,5 +122,20 @@ end";
             Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NameNotFound));
             Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("LOCAL"));
         }
+
+        [Test]
+        public void NameNotFound_Function()
+        {
+            var source = @"
+public int Main()
+begin
+  return Something()
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NameNotFound));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Something"));
+        }
     }
 }

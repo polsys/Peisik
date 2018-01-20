@@ -22,5 +22,16 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
 
             Assert.That(load.Type, Is.EqualTo(PrimitiveType.Bool));
         }
+
+        [Test]
+        public void FunctionCallExpression_Type()
+        {
+            var syntax = new Peisik.Parser.FunctionSyntax(default(TokenPosition),
+                PrimitiveType.Int, Peisik.Parser.Visibility.Private, "Function");
+            var callee = Function.InitializeFromSyntax(syntax, null, "");
+            var call = new FunctionCallExpression(callee, false, null);
+
+            Assert.That(call.Type, Is.EqualTo(PrimitiveType.Int));
+        }
     }
 }

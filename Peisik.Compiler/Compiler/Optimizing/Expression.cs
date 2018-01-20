@@ -21,6 +21,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         protected virtual void SetStore(LocalVariable newStore, OptimizingCompiler compiler, TokenPosition position = default)
         {
+            // Check the type
+            if (newStore != null && Type != newStore.Type)
+                compiler.LogError(DiagnosticCode.WrongType, position, Type.ToString(), newStore.Type.ToString());
+
+            // Set the store
             if (Store != null)
                 Store.AssignmentCount--;
             Store = newStore;
@@ -79,6 +84,30 @@ namespace Polsys.Peisik.Compiler.Optimizing
             else if (syntax is BlockSyntax block)
             {
                 return new SequenceExpression(block, function, compiler, localContext);
+            }
+            else if (syntax is FunctionCallSyntax call)
+            {
+                if (compiler.TryGetFunction(call.FunctionName, function.ModulePrefix, out var callee))
+                {
+                    return new FunctionCallExpression(callee, false, compiler);
+                }
+                else
+                {
+                    compiler.LogError(DiagnosticCode.NameNotFound, call.Position, call.FunctionName);
+                    return null; // Unreached
+                }
+            }
+            else if (syntax is FunctionCallStatementSyntax callStatement)
+            {
+                if (compiler.TryGetFunction(callStatement.Expression.FunctionName, function.ModulePrefix, out var callee))
+                {
+                    return new FunctionCallExpression(callee, true, compiler);
+                }
+                else
+                {
+                    compiler.LogError(DiagnosticCode.NameNotFound, callStatement.Position, callStatement.Expression.FunctionName);
+                    return null; // Unreached
+                }
             }
             else if (syntax is IdentifierSyntax identifier)
             {
@@ -163,9 +192,35 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         protected override void SetStore(LocalVariable newStore, OptimizingCompiler compiler, TokenPosition position = default)
         {
-            // Check the type
-            if (newStore != null && Type != newStore.Type)
-                compiler.LogError(DiagnosticCode.WrongType, position, Type.ToString(), newStore.Type.ToString());
+            base.SetStore(newStore, compiler, position);
+        }
+    }
+
+    /// <summary>
+    /// Represents a function call.
+    /// The call target is always a user-defined function.
+    /// </summary>
+    internal class FunctionCallExpression : Expression
+    {
+        public Function Callee { get; private set; }
+        public bool DiscardResult { get; private set; }
+
+        public FunctionCallExpression(Function callee, bool discardResult, OptimizingCompiler compiler)
+        {
+            Callee = callee;
+            DiscardResult = discardResult;
+            Type = callee.ResultValue.Type;
+        }
+
+        public override Expression Fold(OptimizingCompiler compiler)
+        {
+            return this;
+        }
+
+        protected override void SetStore(LocalVariable newStore, OptimizingCompiler compiler, TokenPosition position = default)
+        {
+            if (DiscardResult && newStore != null)
+                throw new InvalidOperationException("Cannot set Store when DiscardResult is true");
 
             base.SetStore(newStore, compiler, position);
         }
@@ -203,9 +258,6 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         protected override void SetStore(LocalVariable newStore, OptimizingCompiler compiler, TokenPosition position = default)
         {
-            if (newStore != null && newStore.Type != Type)
-                compiler.LogError(DiagnosticCode.WrongType, position, Type.ToString(), newStore.Type.ToString());
-
             base.SetStore(newStore, compiler, position);
         }
     }

@@ -96,6 +96,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
             else if (syntax is ReturnSyntax ret)
             {
+                // Return void
+                if (ret.Expression == null)
+                    return new ReturnExpression(null);
+
                 // Do the return type check here instead of complicating ReturnExpression
                 var returnValue = FromSyntax(ret.Expression, function, compiler, localContext);
                 if (returnValue.Type != function.ResultValue.Type)
@@ -113,7 +117,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
             else
             {
-                throw new NotImplementedException("Unimplemented syntax");
+                throw new NotImplementedException($"Unimplemented syntax {syntax}");
             }
         }
     }

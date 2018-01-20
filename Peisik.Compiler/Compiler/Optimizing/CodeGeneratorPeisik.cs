@@ -73,14 +73,15 @@ namespace Polsys.Peisik.Compiler.Optimizing
                         CompileExpression(expr, function, compiled);
                     break;
                 default:
-                    throw new NotImplementedException("Unhandled expression type");
+                    throw new NotImplementedException($"Unhandled expression type {expression}");
             }
         }
 
         private void CompileReturn(ReturnExpression ret, Function function, CompiledFunction compiled)
         {
-            // Load the return value
-            CompileExpression(ret.Value, function, compiled);
+            // Load the return value, unless we are returning void
+            if (ret.Value != null)
+                CompileExpression(ret.Value, function, compiled);
 
             // Exit the function
             compiled.Bytecode.Add(new BytecodeOp(Opcode.Return, 0));

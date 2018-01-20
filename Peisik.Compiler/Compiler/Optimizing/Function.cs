@@ -69,8 +69,15 @@ namespace Polsys.Peisik.Compiler.Optimizing
         public void Compile()
         {
             ExpressionTree = Expression.FromSyntax(_syntaxTree.CodeBlock, this, _compiler, new LocalVariableContext(this));
+
+            // Void functions may return implicitly, and there must be a return expression in the end
+            // TODO: Refactor this check once the guaranteed return check is in place
+            if (((SequenceExpression)ExpressionTree).Expressions.Count == 0)
+            {
+                ((SequenceExpression)ExpressionTree).Expressions.Add(new ReturnExpression(null));
+            }
         }
-        
+
         internal LocalVariable AddVariable(string debugName, PrimitiveType type)
         {
             var local = new LocalVariable(type, debugName + "$" + Locals.Count);

@@ -56,5 +56,20 @@ PushConst   $literal_5
 Return";
             VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
         }
+
+        [Test]
+        public void VoidReturning()
+        {
+            var source = @"
+public void Main()
+begin
+end";
+            var program = CompileProgram(source);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Void main() [0 locals]
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
     }
 }

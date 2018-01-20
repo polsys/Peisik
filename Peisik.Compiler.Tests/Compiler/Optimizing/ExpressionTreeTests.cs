@@ -18,6 +18,49 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
         }
 
         [Test]
+        public void ExplicitVoidReturn()
+        {
+            var source = @"
+public void Main()
+begin
+  return void
+end";
+            var function = SingleFunctionFromSyntax(source);
+
+            // The expression tree should be
+            // (root)
+            //   |-- Return (null)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = function.ExpressionTree as SequenceExpression;
+            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)sequence.Expressions[0];
+            Assert.That(ret.Value, Is.Null);
+        }
+
+        [Test]
+        public void ImplicitVoidReturn()
+        {
+            var source = @"
+public void Main()
+begin
+end";
+            var function = SingleFunctionFromSyntax(source);
+
+            // The expression tree should be
+            // (root)
+            //   |-- Return (null)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = function.ExpressionTree as SequenceExpression;
+            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)sequence.Expressions[0];
+            Assert.That(ret.Value, Is.Null);
+        }
+
+        [Test]
         public void LiteralReturning()
         {
             var source = @"

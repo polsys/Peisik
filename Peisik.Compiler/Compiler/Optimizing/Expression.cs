@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Polsys.Peisik.Parser;
 
 namespace Polsys.Peisik.Compiler.Optimizing
@@ -85,27 +86,45 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 return new SequenceExpression(block, function, compiler, localContext);
             }
-            else if (syntax is FunctionCallSyntax call)
+            else if (syntax is FunctionCallSyntax || syntax is FunctionCallStatementSyntax)
             {
+                FunctionCallSyntax call;
+                var discardResult = false;
+                if (syntax is FunctionCallSyntax)
+                    call = (FunctionCallSyntax)syntax;
+                else
+                {
+                    call = ((FunctionCallStatementSyntax)syntax).Expression;
+                    discardResult = true;
+                }
+
                 if (compiler.TryGetFunction(call.FunctionName, function.ModulePrefix, out var callee))
                 {
-                    return new FunctionCallExpression(callee, false, compiler);
+                    // Check that the parameter counts match
+                    if (call.Parameters.Count < callee.ParameterTypes.Count)
+                        compiler.LogError(DiagnosticCode.NotEnoughParameters, call.Position,
+                            call.Parameters.Count.ToString(), callee.ParameterTypes.Count.ToString());
+                    if (call.Parameters.Count > callee.ParameterTypes.Count)
+                        compiler.LogError(DiagnosticCode.TooManyParameters, call.Position,
+                            call.Parameters.Count.ToString(), callee.ParameterTypes.Count.ToString());
+
+                    var parameters = new List<Expression>();
+                    for (var i = 0; i < call.Parameters.Count; i++)
+                    {
+                        // Check that the expected and actual types match
+                        var paramExpr = FromSyntax(call.Parameters[i], function, compiler, localContext);
+                        if (paramExpr.Type != callee.ParameterTypes[i])
+                            compiler.LogError(DiagnosticCode.WrongType, call.Parameters[i].Position,
+                                paramExpr.Type.ToString(), callee.ParameterTypes[i].ToString());
+
+                        parameters.Add(paramExpr);
+                    }
+
+                    return new FunctionCallExpression(callee, parameters, discardResult, compiler);
                 }
                 else
                 {
                     compiler.LogError(DiagnosticCode.NameNotFound, call.Position, call.FunctionName);
-                    return null; // Unreached
-                }
-            }
-            else if (syntax is FunctionCallStatementSyntax callStatement)
-            {
-                if (compiler.TryGetFunction(callStatement.Expression.FunctionName, function.ModulePrefix, out var callee))
-                {
-                    return new FunctionCallExpression(callee, true, compiler);
-                }
-                else
-                {
-                    compiler.LogError(DiagnosticCode.NameNotFound, callStatement.Position, callStatement.Expression.FunctionName);
                     return null; // Unreached
                 }
             }
@@ -203,11 +222,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
     internal class FunctionCallExpression : Expression
     {
         public Function Callee { get; private set; }
+        public List<Expression> Parameters { get; private set; }
         public bool DiscardResult { get; private set; }
 
-        public FunctionCallExpression(Function callee, bool discardResult, OptimizingCompiler compiler)
+        public FunctionCallExpression(Function callee, List<Expression> parameters,
+            bool discardResult, OptimizingCompiler compiler)
         {
             Callee = callee;
+            Parameters = parameters;
             DiscardResult = discardResult;
             Type = callee.ResultValue.Type;
         }

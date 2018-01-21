@@ -37,14 +37,21 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             var function = Function.InitializeFromSyntax(syntax, compiler, "");
 
             Assert.That(function.Locals, Has.Exactly(4).Items);
-            Assert.That(function.Locals[0].Name, Is.EqualTo("$result"));
-            Assert.That(function.Locals[0].Type, Is.EqualTo(PrimitiveType.Void));
-            Assert.That(function.Locals[1].Name, Is.EqualTo("intparam"));
-            Assert.That(function.Locals[1].Type, Is.EqualTo(PrimitiveType.Int));
-            Assert.That(function.Locals[2].Name, Is.EqualTo("boolparam"));
-            Assert.That(function.Locals[2].Type, Is.EqualTo(PrimitiveType.Bool));
-            Assert.That(function.Locals[3].Name, Is.EqualTo("realparam"));
-            Assert.That(function.Locals[3].Type, Is.EqualTo(PrimitiveType.Real));
+            // Parameters are passed as locals in order from left to right
+            // These locals are marked special
+            Assert.That(function.Locals[0].Name, Does.StartWith("intparam"));
+            Assert.That(function.Locals[0].Type, Is.EqualTo(PrimitiveType.Int));
+            Assert.That(function.Locals[0].IsParameter, Is.True);
+            Assert.That(function.Locals[1].Name, Does.StartWith("boolparam"));
+            Assert.That(function.Locals[1].Type, Is.EqualTo(PrimitiveType.Bool));
+            Assert.That(function.Locals[1].IsParameter, Is.True);
+            Assert.That(function.Locals[2].Name, Does.StartWith("realparam"));
+            Assert.That(function.Locals[2].Type, Is.EqualTo(PrimitiveType.Real));
+            Assert.That(function.Locals[2].IsParameter, Is.True);
+
+            Assert.That(function.Locals[3].Name, Is.EqualTo("$result"));
+            Assert.That(function.Locals[3].Type, Is.EqualTo(PrimitiveType.Void));
+            Assert.That(function.Locals[3].IsParameter, Is.False);
         }
     }
 }

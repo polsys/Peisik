@@ -32,6 +32,11 @@
         internal int UseCount;
 
         /// <summary>
+        /// If true, this local is a parameter to the containing function.
+        /// </summary>
+        internal bool IsParameter;
+
+        /// <summary>
         /// TODO: Will be replaced with an abstraction for storage location.
         /// </summary>
         internal int LocalIndex;

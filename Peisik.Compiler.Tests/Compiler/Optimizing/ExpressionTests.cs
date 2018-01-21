@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Collections.Generic;
+using NUnit.Framework;
 using Polsys.Peisik.Compiler.Optimizing;
 
 namespace Polsys.Peisik.Tests.Compiler.Optimizing
@@ -29,7 +30,7 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             var syntax = new Peisik.Parser.FunctionSyntax(default(TokenPosition),
                 PrimitiveType.Int, Peisik.Parser.Visibility.Private, "Function");
             var callee = Function.InitializeFromSyntax(syntax, null, "");
-            var call = new FunctionCallExpression(callee, false, null);
+            var call = new FunctionCallExpression(callee, new List<Expression>(), false, null);
 
             Assert.That(call.Type, Is.EqualTo(PrimitiveType.Int));
         }

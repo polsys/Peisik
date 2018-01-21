@@ -15,15 +15,18 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public Expression ExpressionTree;
 
+        public List<PrimitiveType> ParameterTypes { get; private set; }
+
         public SideEffect SideEffects;
 
         internal List<LocalVariable> Locals = new List<LocalVariable>();
 
-        internal LocalVariable ResultValue => Locals[0];
+        internal LocalVariable ResultValue { get; private set; }
 
         public OptimizingCompiler Compiler => _compiler;
         private OptimizingCompiler _compiler;
         private FunctionSyntax _syntaxTree;
+        private LocalVariableContext _localContext;
 
         internal Function(OptimizingCompiler compiler)
         {
@@ -43,19 +46,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 function.ModulePrefix = moduleName + ".";
             function.FullName = (function.ModulePrefix + syntaxTree.Name).ToLowerInvariant();
 
-            // Initialize a local for the result
+            // Initialize a local for parameters and the result
             // See the doc comment on ReturnExpression for explanation
             // This is done for simplicity even when returning void
-            function.Locals = new List<LocalVariable>
-            {
-                new LocalVariable(syntaxTree.ReturnType, "$result")
-            };
-
-            // Initialize locals for parameters
+            function._localContext = new LocalVariableContext(function);
+            function.ParameterTypes = new List<PrimitiveType>();
             foreach (var param in syntaxTree.Parameters)
             {
-                function.Locals.Add(new LocalVariable(param.Type, param.Name.ToLowerInvariant()) { AssignmentCount = 1 });
+                function.ParameterTypes.Add(param.Type);
+                var localForParam = function._localContext.AddLocal(param.Name, param.Type, param.Position);
+                localForParam.IsParameter = true;
             }
+            var resultLocal = new LocalVariable(syntaxTree.ReturnType, "$result");
+            function.Locals.Add(resultLocal);
+            function.ResultValue = resultLocal;
 
             // Store the expression tree for later compilation
             function._syntaxTree = syntaxTree;
@@ -68,7 +72,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         /// </summary>
         public void Compile()
         {
-            ExpressionTree = Expression.FromSyntax(_syntaxTree.CodeBlock, this, _compiler, new LocalVariableContext(this));
+            ExpressionTree = Expression.FromSyntax(_syntaxTree.CodeBlock, this, _compiler, _localContext);
 
             // Void functions may return implicitly, and there must be a return expression in the end
             // TODO: Refactor this check once the guaranteed return check is in place

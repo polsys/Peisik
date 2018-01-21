@@ -105,6 +105,62 @@ Return";
         }
 
         [Test]
+        public void FunctionCall_ConstantParameters()
+        {
+            var source = @"
+public int GetValue(int a, int b)
+begin
+  return 42
+end
+
+public int Main()
+begin
+  return GetValue(1, 2)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            // Parameters are always evaluated from left to right
+            var disasm = @"Int main() [0 locals]
+PushConst   $literal_1
+PushConst   $literal_2
+Call        getvalue
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void FunctionCall_ComplexParameters()
+        {
+            var source = @"
+public int GetFirstValue(int a)
+begin
+  return a
+end
+
+public int GetValue(int a, int b)
+begin
+  return 42
+end
+
+public int Main()
+begin
+  return GetValue(GetFirstValue(1), 2)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            // Parameters are always evaluated from left to right
+            var disasm = @"Int main() [0 locals]
+PushConst   $literal_1
+Call        getfirstvalue
+PushConst   $literal_2
+Call        getvalue
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
         public void FunctionCall_Void()
         {
             var source = @"
@@ -146,6 +202,31 @@ end";
             var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
 
             Assert.That(program.Functions[program.MainFunctionIndex].FullName, Is.EqualTo("main"));
+        }
+        [TestCase(Optimization.None)]
+        [TestCase(Optimization.Full)]
+        public void ParametersAreCorrectlyPassed(Optimization optimizationLevel)
+        {
+            var source = @"
+public int Function(int a, bool b, real c)
+begin
+  int result a
+  real something c
+  # b goes unused
+  return result
+end
+
+public int Main()
+begin
+  return Function(1, true, 1.0)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var function = program.Functions[1 - program.MainFunctionIndex];
+            Assert.That(function.Locals[0].name, Does.StartWith("a"));
+            Assert.That(function.Locals[1].name, Does.StartWith("b"));
+            Assert.That(function.Locals[2].name, Does.StartWith("c"));
         }
 
         [Test]

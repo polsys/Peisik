@@ -21,6 +21,67 @@ end";
 
             Assert.That(diagnostics, Has.Exactly(1).Items);
             Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.MayNotAssignToConst));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Value"));
+        }
+
+        [Test]
+        public void FunctionCall_NotEnoughParameters()
+        {
+            var source = @"
+private void Function(int a, bool b)
+begin
+end
+
+public void Main()
+begin
+  Function(1)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NotEnoughParameters));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("1"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("2"));
+        }
+
+        [Test]
+        public void FunctionCall_TooManyParameters()
+        {
+            var source = @"
+private void Function(int a, bool b)
+begin
+end
+
+public void Main()
+begin
+  Function(1, true, 3.0)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.TooManyParameters));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("3"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("2"));
+        }
+
+        [Test]
+        public void FunctionCall_WrongType()
+        {
+            var source = @"
+private void Function(int a, bool b)
+begin
+end
+
+public void Main()
+begin
+  Function(1, 3.0)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.WrongType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Real"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Bool"));
         }
 
         [Test]

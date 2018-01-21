@@ -42,10 +42,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
             FoldSingleUseLocals(function);
 
             // Create the locals table
+            // Parameters are always included, whereas unused locals are ignored
             // TODO: This will be changed once register allocation exists
             foreach (var local in function.Locals)
             {
-                if (local.UseCount == 0 && local.AssignmentCount == 0)
+                if (!local.IsParameter && local.UseCount == 0 && local.AssignmentCount == 0)
                     continue;
                 local.LocalIndex = compiled.Locals.Count;
                 compiled.AddLocal(local.Name, local.Type);
@@ -77,6 +78,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 case FunctionCallExpression call:
                     CompileCall(call, function, compiled);
                     break;
+                case LocalLoadExpression load:
+                    EmitPush(load.Local, compiled);
+                    if (load.Store != null)
+                        EmitStore(load.Store, compiled);
+                    break;
                 case ReturnExpression ret:
                     CompileReturn(ret, function, compiled);
                     break;
@@ -91,7 +97,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         private void CompileCall(FunctionCallExpression call, Function function, CompiledFunction compiled)
         {
-            // TODO: Load parameter
+            // Load each parameter onto the execution stack
+            foreach (var param in call.Parameters)
+            {
+                CompileExpression(param, function, compiled);
+            }
 
             // Emit call
             compiled.Bytecode.Add(new BytecodeOp(Opcode.Call, GetFunctionIndex(call.Callee.FullName)));

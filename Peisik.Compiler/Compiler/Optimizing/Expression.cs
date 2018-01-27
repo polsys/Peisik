@@ -140,6 +140,19 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 }
                 return new LocalLoadExpression(localContext.GetLocal(identifier.Name, identifier.Position), compiler);
             }
+            else if (syntax is IfSyntax conditional)
+            {
+                // Compile the boolean condition
+                var condition = FromSyntax(conditional.Condition, function, compiler, localContext);
+                if (condition.Type != PrimitiveType.Bool)
+                    compiler.LogError(DiagnosticCode.WrongType, conditional.Condition.Position, condition.Type.ToString(), "Bool");
+
+                // Compile the executable blocks
+                var thenExpr = FromSyntax(conditional.ThenBlock, function, compiler, localContext);
+                var elseExpr = FromSyntax(conditional.ElseBlock, function, compiler, localContext);
+
+                return new IfExpression(condition, thenExpr, elseExpr);
+            }
             else if (syntax is LiteralSyntax literal)
             {
                 return new ConstantExpression(literal, compiler);

@@ -72,6 +72,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     return new ConstantExpression(Convert.ToDouble(leftConst.Value) + Convert.ToDouble(rightConst.Value), compiler, Store);
                 }
             }
+            else if (InternalFunctionId == InternalFunction.Equal)
+            {
+                // Overloaded object.Equals should do the comparison correctly
+                return new ConstantExpression(leftConst.Value.Equals(rightConst.Value), compiler, Store);
+            }
             // TODO: Implement more
 
             return this;

@@ -217,6 +217,24 @@ end";
         }
 
         [Test]
+        public void If_NonBoolCondition()
+        {
+            var source = @"
+public void Main()
+begin
+  if 2
+  begin
+  end
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.WrongType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Int"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Bool"));
+        }
+
+        [Test]
         public void LocalAlreadyDefined()
         {
             var source = @"

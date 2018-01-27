@@ -184,6 +184,80 @@ Return";
         }
 
         [Test]
+        public void InternalCall_Unary()
+        {
+            var source = @"
+public int Main()
+begin
+  return -(5)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Int main() [0 locals]
+PushConst   $literal_5
+CallI1      Minus
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void InternalCall_Binary()
+        {
+            var source = @"
+public int Main()
+begin
+  return -(5, 1)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Int main() [0 locals]
+PushConst   $literal_5
+PushConst   $literal_1
+CallI2      Minus
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void InternalCall_FailFast()
+        {
+            var source = @"
+public void Main()
+begin
+  FailFast()
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Void main() [0 locals]
+CallI0      FailFast
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void InternalCall_Print()
+        {
+            var source = @"
+public void Main()
+begin
+  Print(true, 1, 1.0)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Void main() [0 locals]
+PushConst   $literal_true
+PushConst   $literal_1
+PushConst   $literal_1r
+CallI3      Print
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
         public void MainFunctionIndex_IsSet()
         {
             var source = @"

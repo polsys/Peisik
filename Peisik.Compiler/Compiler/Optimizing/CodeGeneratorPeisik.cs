@@ -70,10 +70,18 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             switch (expression)
             {
+                case BinaryExpression binary:
+                    CompileExpression(binary.Left, function, compiled);
+                    CompileExpression(binary.Right, function, compiled);
+                    compiled.Bytecode.Add(new BytecodeOp(Opcode.CallI2, (short)binary.InternalFunctionId));
+                    break;
                 case ConstantExpression c:
                     EmitPush(c, compiled);
                     if (c.Store != null)
                         EmitStore(c.Store, compiled);
+                    break;
+                case FailFastExpression _:
+                    compiled.Bytecode.Add(new BytecodeOp(Opcode.CallI0, (short)InternalFunction.FailFast));
                     break;
                 case FunctionCallExpression call:
                     CompileCall(call, function, compiled);
@@ -83,12 +91,19 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     if (load.Store != null)
                         EmitStore(load.Store, compiled);
                     break;
+                case PrintExpression print:
+                    CompilePrint(print, function, compiled);
+                    break;
                 case ReturnExpression ret:
                     CompileReturn(ret, function, compiled);
                     break;
                 case SequenceExpression sequence:
                     foreach (var expr in sequence.Expressions)
                         CompileExpression(expr, function, compiled);
+                    break;
+                case UnaryExpression unary:
+                    CompileExpression(unary.Expression, function, compiled);
+                    compiled.Bytecode.Add(new BytecodeOp(Opcode.CallI1, (short)unary.InternalFunctionId));
                     break;
                 default:
                     throw new NotImplementedException($"Unhandled expression type {expression}");
@@ -111,6 +126,22 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 compiled.Bytecode.Add(new BytecodeOp(Opcode.PopDiscard, 0));
             }
+        }
+
+        private void CompilePrint(PrintExpression print, Function function, CompiledFunction compiled)
+        {
+            // Sanity check for parameter count
+            if (print.Expressions.Count > 7)
+                throw new ArgumentOutOfRangeException("print.Expressions.Count");
+
+            // Compile each parameter
+            foreach (var param in print.Expressions)
+                CompileExpression(param, function, compiled);
+
+            // Then emit the call
+            // The opcode is based on the parameter count
+            var opcode = (Opcode)((int)Opcode.CallI0 + print.Expressions.Count);
+            compiled.Bytecode.Add(new BytecodeOp(opcode, (short)InternalFunction.Print));
         }
 
         private void CompileReturn(ReturnExpression ret, Function function, CompiledFunction compiled)

@@ -85,6 +85,138 @@ end";
         }
 
         [Test]
+        public void InternalCall_NotEnoughParams()
+        {
+            var source = @"
+public void Main()
+begin
+  +(1)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NotEnoughParameters));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("1"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("2"));
+        }
+
+        [Test]
+        public void InternalCall_TooManyParameters()
+        {
+            var source = @"
+public void Main()
+begin
+  +(1,2,3)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.TooManyParameters));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("3"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("2"));
+        }
+
+        [Test]
+        public void InternalCall_AnyNumeric_NonNumeric()
+        {
+            var source = @"
+public void Main()
+begin
+  +(1, true)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.WrongType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Bool"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Int|Real"));
+        }
+
+        [Test]
+        public void InternalCall_Int_NonInteger()
+        {
+            var source = @"
+public void Main()
+begin
+  %(1, 3.0)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.WrongType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Real"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Int"));
+        }
+
+        [Test]
+        public void InternalCall_SameType_NotSame()
+        {
+            var source = @"
+public void Main()
+begin
+  ==(1, 3.0)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.ParamsMustBeSameType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Real"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Int"));
+        }
+
+        [Test]
+        public void InternalCall_BoolOrInt_NotEither()
+        {
+            var source = @"
+public void Main()
+begin
+  xor(true, 3.0)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.WrongType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Real"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Bool|Int"));
+        }
+
+        [Test]
+        public void InternalCall_BoolOrInt_NotSame()
+        {
+            var source = @"
+public void Main()
+begin
+  xor(true, 3)
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.ParamsMustBeSameType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Int"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Bool"));
+        }
+
+        [Test]
+        public void InternalCall_AnyType_VoidNotAllowed()
+        {
+            var source = @"
+private void Func()
+begin
+end
+
+public void Main()
+begin
+  print(Func())
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.WrongType));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Void"));
+            Assert.That(diagnostics[0].Expected, Is.EqualTo("Bool|Int|Real"));
+        }
+
+        [Test]
         public void LocalAlreadyDefined()
         {
             var source = @"

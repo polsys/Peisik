@@ -3,11 +3,26 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Polsys.Peisik.Parser;
 using Polsys.Peisik.Compiler.Optimizing;
+using Polsys.Peisik.Compiler;
 
 namespace Polsys.Peisik.Tests.Compiler.Optimizing
 {
     class SequenceExpressionTests : CompilerTestBase
     {
+        [Test]
+        public void Fold_ReturnsSingleExpressionFolded()
+        {
+            var local = new LocalVariable(PrimitiveType.Int, "local");
+            var constant = new ConstantExpression(LiteralSyntax.CreateIntLiteral(new TokenPosition(), 5), null, local);
+            var binary = new BinaryExpression(InternalFunctions.Functions["+"], constant, constant);
+            var sequence = new SequenceExpression();
+            sequence.Expressions.Add(binary);
+
+            // The binary should be folded into a constant and then returned, as there's no point having a sequence of 1 item
+            var folded = sequence.Fold(null);
+            Assert.That(folded, Is.InstanceOf<ConstantExpression>());
+        }
+
         [Test]
         public void FoldSingleUseLocals_FoldsCorrectly()
         {

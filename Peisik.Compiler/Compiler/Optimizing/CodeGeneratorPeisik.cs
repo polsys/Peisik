@@ -86,6 +86,9 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 case FunctionCallExpression call:
                     CompileCall(call, function, compiled);
                     break;
+                case IfExpression cond:
+                    CompileIf(cond, function, compiled);
+                    break;
                 case LocalLoadExpression load:
                     EmitPush(load.Local, compiled);
                     if (load.Store != null)
@@ -126,6 +129,42 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 compiled.Bytecode.Add(new BytecodeOp(Opcode.PopDiscard, 0));
             }
+        }
+
+        private void CompileIf(IfExpression cond, Function function, CompiledFunction compiled)
+        {
+            // Emit the condition check
+            CompileExpression(cond.Condition, function, compiled);
+
+            // If false, jump to the 'else' block
+            // As we don't know the length of the 'then' block yet, keep a reference for a later fixup
+            var elseJumpPosition = compiled.Bytecode.Count;
+            compiled.Bytecode.Add(new BytecodeOp(Opcode.Invalid, 0));
+
+            // Emit the 'then' block, with a jump over the 'else' block in the end
+            CompileExpression(cond.ThenExpression, function, compiled);
+            var endJumpPosition = compiled.Bytecode.Count;
+            var thenLength = endJumpPosition - elseJumpPosition; // Includes jump over else
+            compiled.Bytecode.Add(new BytecodeOp(Opcode.Invalid, 0));
+
+            // Emit the else block
+            CompileExpression(cond.ElseExpression, function, compiled);
+            var elseLength = compiled.Bytecode.Count - endJumpPosition - 1;
+
+            // Fix up the jumps
+            if (elseLength == 0)
+            {
+                // Always-on optimization: if the 'else' block is empty, don't emit the jump over it
+                // This also makes the 'then' block one instruction shorter
+                thenLength--;
+                compiled.Bytecode.RemoveAt(endJumpPosition);
+            }
+            else
+            {
+                // +1 comes from the fact that the jump instruction itself is counted
+                compiled.Bytecode[endJumpPosition] = new BytecodeOp(Opcode.Jump, (short)(elseLength + 1));
+            }
+            compiled.Bytecode[elseJumpPosition] = new BytecodeOp(Opcode.JumpFalse, (short)(thenLength + 1));
         }
 
         private void CompilePrint(PrintExpression print, Function function, CompiledFunction compiled)

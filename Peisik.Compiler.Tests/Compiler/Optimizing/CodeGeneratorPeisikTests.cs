@@ -258,6 +258,97 @@ Return";
         }
 
         [Test]
+        public void If_EmptyBody()
+        {
+            var source = @"
+private void Main()
+begin
+  if true
+  begin
+  end
+  else
+  begin
+  end
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var dis = @"
+Void main() [0 locals]
+PushConst   $literal_true
+JumpFalse   +1
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, dis);
+        }
+
+        [Test]
+        public void If_FullBody()
+        {
+            var source = @"
+private int Main()
+begin
+  int result 0
+
+  if true
+  begin
+    result = 1
+  end
+  else
+  begin
+    result = 2
+  end
+  return result
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var dis = @"
+Int main() [1 locals]
+PushConst   $literal_0
+PopLocal    result$1
+PushConst   $literal_true
+JumpFalse   +4
+PushConst   $literal_1
+PopLocal    result$1
+Jump        +3
+PushConst   $literal_2
+PopLocal    result$1
+PushLocal   result$1
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, dis);
+        }
+
+        [Test]
+        public void If_NoElse()
+        {
+            var source = @"
+private int Main()
+begin
+  int result 0
+
+  if true
+  begin
+    result = 1
+  end
+  return result
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var dis = @"
+Int main() [1 locals]
+PushConst   $literal_0
+PopLocal    result$1
+PushConst   $literal_true
+JumpFalse   +3
+PushConst   $literal_1
+PopLocal    result$1
+PushLocal   result$1
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, dis);
+        }
+
+        [Test]
         public void MainFunctionIndex_IsSet()
         {
             var source = @"

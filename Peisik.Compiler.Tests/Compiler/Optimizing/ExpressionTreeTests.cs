@@ -305,6 +305,52 @@ end";
         }
 
         [Test]
+        public void IfExpression()
+        {
+            var source = @"
+public int Main()
+begin
+  if true
+  begin
+    return 1
+  end
+  else
+  begin
+    print(2)
+    return 2
+  end
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
+
+            // The expression tree should be
+            // (root)
+            //   |-- IfExpression
+            //       | -- ConstantExpression (true)
+            //       | -- SequenceExpression
+            //       |    | -- ReturnExpression (1)
+            //       |
+            //       | -- SequenceExpression
+            //            | -- PrintExpression (2)
+            //            | -- ReturnExpression (2)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = (SequenceExpression)function.ExpressionTree;
+            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<IfExpression>());
+            var expr = (IfExpression)sequence.Expressions[0];
+            Assert.That(expr.Condition, Is.InstanceOf<ConstantExpression>());
+            Assert.That(expr.Condition.Type, Is.EqualTo(PrimitiveType.Bool));
+
+            Assert.That(expr.ThenExpression, Is.InstanceOf<SequenceExpression>());
+            Assert.That(((SequenceExpression)expr.ThenExpression).Expressions, Has.Exactly(1).Items);
+            Assert.That(expr.ElseExpression, Is.InstanceOf<SequenceExpression>());
+            Assert.That(((SequenceExpression)expr.ElseExpression).Expressions, Has.Exactly(2).Items);
+        }
+
+        [Test]
         public void ConstantFolding_BinaryExpression()
         {
             var source = @"
@@ -318,20 +364,55 @@ end";
             function.Compile();
             function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
 
-            // The expression tree should be
-            // (root)
-            //   |-- Return
-            //       | -- ConstantExpression (44.1)
-            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
-            var sequence = (SequenceExpression)function.ExpressionTree;
-            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+            // After constant folding, the expression tree should be
+            // Return
+            //   | -- ConstantExpression (44.1)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)function.ExpressionTree;
 
-            Assert.That(sequence.Expressions[0], Is.InstanceOf<ReturnExpression>());
-            var ret = (ReturnExpression)sequence.Expressions[0];
             Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
             var result = (ConstantExpression)ret.Value;
             Assert.That(result.Type, Is.EqualTo(PrimitiveType.Real));
             Assert.That(result.Value, Is.EqualTo(44.1).Within(0.00001));
+        }
+
+        [Test]
+        public void ConstantFolding_InIf()
+        {
+            var source = @"
+public int Main()
+begin
+  if ==(1, 1)
+  begin
+    return +(1, 99)
+  end
+  else
+  begin
+    return +(-1, 1)
+  end
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
+            function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
+
+            // After constant folding, the expression tree should be
+            // If
+            //   | -- ConstantExpression (true)
+            //   | -- ReturnExpression (ConstantExpression 100)
+            //   | -- ReturnExpression (ConstantExpression 0)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<IfExpression>());
+            var cond = (IfExpression)function.ExpressionTree;
+
+            Assert.That(cond.Condition, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)cond.Condition).Value, Is.EqualTo(true));
+
+            Assert.That(cond.ThenExpression, Is.InstanceOf<ReturnExpression>());
+            Assert.That(((ReturnExpression)cond.ThenExpression).Value, Is.InstanceOf<ConstantExpression>());
+
+            Assert.That(cond.ElseExpression, Is.InstanceOf<ReturnExpression>());
+            Assert.That(((ReturnExpression)cond.ElseExpression).Value, Is.InstanceOf<ConstantExpression>());
         }
     }
 }

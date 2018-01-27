@@ -153,5 +153,22 @@ end";
             Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NameNotFound));
             Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("OtherModule.Function"));
         }
+
+        [Test]
+        public void Optimization_ConstantFolding()
+        {
+            var source = @"
+public void Main()
+begin
+  Print(+(2, 3))
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.Full);
+            
+            var disasm = @"Void main() [0 locals]
+PushConst   $literal_5
+CallI1      Print
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
     }
 }

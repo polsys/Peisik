@@ -303,5 +303,35 @@ end";
             Assert.That(print.Expressions[1].Type, Is.EqualTo(PrimitiveType.Int));
             Assert.That(print.Expressions[2].Type, Is.EqualTo(PrimitiveType.Real));
         }
+
+        [Test]
+        public void ConstantFolding_BinaryExpression()
+        {
+            var source = @"
+public real Main()
+begin
+  return +(42, 2.1)
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
+            function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
+
+            // The expression tree should be
+            // (root)
+            //   |-- Return
+            //       | -- ConstantExpression (44.1)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = (SequenceExpression)function.ExpressionTree;
+            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)sequence.Expressions[0];
+            Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
+            var result = (ConstantExpression)ret.Value;
+            Assert.That(result.Type, Is.EqualTo(PrimitiveType.Real));
+            Assert.That(result.Value, Is.EqualTo(44.1).Within(0.00001));
+        }
     }
 }

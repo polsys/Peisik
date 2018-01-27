@@ -59,8 +59,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     {
                         AddConstant(constant.Name, module.ModuleName, constant.Visibility, constant.Value);
                     }
-
-                    // TODO: Module name
+                    
                     foreach (var function in module.Functions)
                     {
                         var f = Function.InitializeFromSyntax(function, this, module.ModuleName);
@@ -76,18 +75,21 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
                 // Compile each function
                 // Actual syntactic analysis is performed in this pass
+                // Also do some preliminary analysis and simple optimizations (if desired)
                 foreach ((var function, _) in _functions.Values)
                 {
                     function.Compile();
+                    function.AnalyzeAndOptimizePreInlining(_optimizationLevel);
                 }
 
                 // Ensure that there is a Main() function
 
                 // Run desired optimizations
+                // - inlining
+                // - optimizations that are run after inlining
 
                 // Generate code
                 var codeGen = new CodeGeneratorPeisik();
-
                 foreach ((var function, _) in _functions.Values)
                 {
                     codeGen.CompileFunction(function);

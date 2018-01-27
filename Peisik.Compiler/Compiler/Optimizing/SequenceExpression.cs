@@ -30,6 +30,12 @@ namespace Polsys.Peisik.Compiler.Optimizing
         public override Expression Fold(OptimizingCompiler compiler)
         {
             // TODO: If this sequence has only 1 item, return it
+
+            // CODE SMELL: And here we violate our kind-of qimmutability...
+            for (var i = 0; i < Expressions.Count; i++)
+            {
+                Expressions[i] = Expressions[i].Fold(compiler);
+            }
             return this;
         }
 

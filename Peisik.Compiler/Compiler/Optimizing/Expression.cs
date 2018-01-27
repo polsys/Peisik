@@ -337,6 +337,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
+            // CODE SMELL: Immutability violation
+            for (var i = 0; i < Parameters.Count; i++)
+                Parameters[i] = Parameters[i].Fold(compiler);
+
             return this;
         }
 
@@ -406,7 +410,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
-            return this;
+            if (Value != null)
+                return new ReturnExpression(Value.Fold(compiler));
+            else
+                return this;
         }
 
         internal override Expression TryInlineLocalAssignment(Expression assignment)

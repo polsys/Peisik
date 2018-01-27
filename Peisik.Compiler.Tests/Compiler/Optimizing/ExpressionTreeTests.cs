@@ -188,10 +188,7 @@ public int Main()
 begin
   return -(42)
 end";
-            var syntax = ParseStringWithoutDiagnostics(source);
-            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
-            function.Compile();
+            var function = SingleFunctionFromSyntax(source);
 
             // The expression tree should be
             // (root)
@@ -219,10 +216,7 @@ public real Main()
 begin
   return -(42, 2.1)
 end";
-            var syntax = ParseStringWithoutDiagnostics(source);
-            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
-            function.Compile();
+            var function = SingleFunctionFromSyntax(source);
 
             // The expression tree should be
             // (root)
@@ -252,10 +246,7 @@ public void Main()
 begin
   FailFast()
 end";
-            var syntax = ParseStringWithoutDiagnostics(source);
-            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
-            function.Compile();
+            var function = SingleFunctionFromSyntax(source);
 
             // The expression tree should be
             // (root)
@@ -277,10 +268,7 @@ public void Main()
 begin
   print(true, 1, 1.0)
 end";
-            var syntax = ParseStringWithoutDiagnostics(source);
-            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
-            function.Compile();
+            var function = SingleFunctionFromSyntax(source);
 
             // The expression tree should be
             // (root)
@@ -320,10 +308,7 @@ begin
     return 2
   end
 end";
-            var syntax = ParseStringWithoutDiagnostics(source);
-            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
-            function.Compile();
+            var function = SingleFunctionFromSyntax(source);
 
             // The expression tree should be
             // (root)
@@ -358,10 +343,7 @@ public real Main()
 begin
   return +(42, 2.1)
 end";
-            var syntax = ParseStringWithoutDiagnostics(source);
-            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
-            function.Compile();
+            var function = SingleFunctionFromSyntax(source);
             function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
 
             // After constant folding, the expression tree should be
@@ -391,10 +373,7 @@ begin
     return +(-1, 1)
   end
 end";
-            var syntax = ParseStringWithoutDiagnostics(source);
-            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
-            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
-            function.Compile();
+            var function = SingleFunctionFromSyntax(source);
             function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
 
             // After constant folding, the expression tree should be

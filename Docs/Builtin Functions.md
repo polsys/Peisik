@@ -12,7 +12,7 @@ The second section list functions in the `Math` namespace. The namespace is alwa
 Immediately terminates program execution.
 
 ### `Print`
-**Parameters:** 0 to 7 parameters of any type.
+**Parameters:** 0 to 7 parameters. They may be a mix of Bool, Int and Real parameters.
 **Returns:** Void.
 Prints a line containing each parameter separated by a single space.
 

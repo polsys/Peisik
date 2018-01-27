@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using NUnit.Framework;
 using Polsys.Peisik.Parser;
+using Polsys.Peisik.Compiler;
 using Polsys.Peisik.Compiler.Optimizing;
 
 namespace Polsys.Peisik.Tests.Compiler.Optimizing
@@ -103,15 +104,18 @@ end";
             // (root)
             //   |-- Constant -> local
             //   |-- Constant -> local
+            //   |-- Return
             Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
             var sequence = function.ExpressionTree as SequenceExpression;
-            Assert.That(sequence.Expressions, Has.Exactly(2).Items);
+            Assert.That(sequence.Expressions, Has.Exactly(3).Items);
 
             Assert.That(sequence.Expressions[0], Is.InstanceOf<ConstantExpression>());
             Assert.That(sequence.Expressions[0].Store, Is.SameAs(local));
 
             Assert.That(sequence.Expressions[1], Is.InstanceOf<ConstantExpression>());
             Assert.That(sequence.Expressions[1].Store, Is.SameAs(local));
+
+            Assert.That(sequence.Expressions[2], Is.InstanceOf<ReturnExpression>());
         }
 
         [Test]
@@ -174,6 +178,130 @@ end";
             var ret = (ReturnExpression)sequence.Expressions[0];
             Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
             Assert.That(((ConstantExpression)ret.Value).Value, Is.EqualTo(42L));
+        }
+
+        [Test]
+        public void UnaryExpression()
+        {
+            var source = @"
+public int Main()
+begin
+  return -(42)
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
+
+            // The expression tree should be
+            // (root)
+            //   |-- Return
+            //       | -- UnaryExpression (-)
+            //            | -- ConstantExpression (42)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = (SequenceExpression)function.ExpressionTree;
+            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)sequence.Expressions[0];
+            Assert.That(ret.Value, Is.InstanceOf<UnaryExpression>());
+            var unaryExpr = (UnaryExpression)ret.Value;
+            Assert.That(unaryExpr.InternalFunctionId, Is.EqualTo(InternalFunction.Minus));
+            Assert.That(unaryExpr.Expression, Is.InstanceOf<ConstantExpression>());
+            Assert.That(unaryExpr.Type, Is.EqualTo(PrimitiveType.Int));
+        }
+
+        [Test]
+        public void BinaryExpression()
+        {
+            var source = @"
+public real Main()
+begin
+  return -(42, 2.1)
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
+
+            // The expression tree should be
+            // (root)
+            //   |-- Return
+            //       | -- BinaryExpression (-)
+            //            | -- ConstantExpression (42)
+            //            | -- ConstantExpression (2.1)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = (SequenceExpression)function.ExpressionTree;
+            Assert.That(sequence.Expressions, Has.Exactly(1).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)sequence.Expressions[0];
+            Assert.That(ret.Value, Is.InstanceOf<BinaryExpression>());
+            var binaryExpr = (BinaryExpression)ret.Value;
+            Assert.That(binaryExpr.InternalFunctionId, Is.EqualTo(InternalFunction.Minus));
+            Assert.That(binaryExpr.Left, Is.InstanceOf<ConstantExpression>());
+            Assert.That(binaryExpr.Right, Is.InstanceOf<ConstantExpression>());
+            Assert.That(binaryExpr.Type, Is.EqualTo(PrimitiveType.Real));
+        }
+
+        [Test]
+        public void FailFastExpression()
+        {
+            var source = @"
+public void Main()
+begin
+  FailFast()
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
+
+            // The expression tree should be
+            // (root)
+            //   |-- FailFast
+            //   |-- Return [redundant, but good to have]
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = (SequenceExpression)function.ExpressionTree;
+            Assert.That(sequence.Expressions, Has.Exactly(2).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<FailFastExpression>());
+            Assert.That(sequence.Expressions[1], Is.InstanceOf<ReturnExpression>());
+        }
+
+        [Test]
+        public void PrintExpression()
+        {
+            var source = @"
+public void Main()
+begin
+  print(true, 1, 1.0)
+end";
+            var syntax = ParseStringWithoutDiagnostics(source);
+            var compiler = new OptimizingCompiler(new List<ModuleSyntax>() { syntax }, Optimization.None);
+            var function = Function.InitializeFromSyntax(syntax.Functions[0], compiler, "");
+            function.Compile();
+
+            // The expression tree should be
+            // (root)
+            //   |-- PrintExpression
+            //   |   | -- ConstantExpression (true)
+            //   |   | -- ConstantExpression (1)
+            //   |   | -- ConstantExpression (1.0)
+            //   |
+            //   |--Return
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = (SequenceExpression)function.ExpressionTree;
+            Assert.That(sequence.Expressions, Has.Exactly(2).Items);
+
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<PrintExpression>());
+            Assert.That(sequence.Expressions[1], Is.InstanceOf<ReturnExpression>());
+
+            var print = (PrintExpression)sequence.Expressions[0];
+            Assert.That(print.Expressions, Has.Exactly(3).Items.And.All.InstanceOf<ConstantExpression>());
+            Assert.That(print.Expressions[0].Type, Is.EqualTo(PrimitiveType.Bool));
+            Assert.That(print.Expressions[1].Type, Is.EqualTo(PrimitiveType.Int));
+            Assert.That(print.Expressions[2].Type, Is.EqualTo(PrimitiveType.Real));
         }
     }
 }

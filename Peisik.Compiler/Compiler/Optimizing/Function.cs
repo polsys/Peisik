@@ -76,7 +76,8 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
             // Void functions may return implicitly, and there must be a return expression in the end
             // TODO: Refactor this check once the guaranteed return check is in place
-            if (((SequenceExpression)ExpressionTree).Expressions.Count == 0)
+            List<Expression> expressions = ((SequenceExpression)ExpressionTree).Expressions;
+            if (expressions.Count == 0 || !(expressions[expressions.Count - 1] is ReturnExpression))
             {
                 ((SequenceExpression)ExpressionTree).Expressions.Add(new ReturnExpression(null));
             }

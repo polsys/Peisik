@@ -57,6 +57,10 @@
     <Compile Include="Compiler\Optimizing\Optimization.cs" />
     <Compile Include="Compiler\Optimizing\OptimizingCompiler.cs" />
     <Compile Include="Compiler\Optimizing\SequenceExpression.cs" />
+    <Compile Include="Compiler\Optimizing\BinaryExpression.cs" />
+    <Compile Include="Compiler\Optimizing\FailFastExpression.cs" />
+    <Compile Include="Compiler\Optimizing\PrintExpression.cs" />
+    <Compile Include="Compiler\Optimizing\UnaryExpression.cs" />
     <Compile Include="Compiler\SemanticCompiler.cs" />
     <Compile Include="Parser\AssignmentSyntax.cs" />
     <Compile Include="Parser\IfSyntax.cs" />

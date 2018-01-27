@@ -83,6 +83,23 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
         }
 
+        /// <summary>
+        /// Does analysis related to optimization and some optimization passes.
+        /// This is required before this function can be inlined.
+        /// </summary>
+        /// <param name="optimizationLevel">Controls which optimizations to perform.</param>
+        public void AnalyzeAndOptimizePreInlining(Optimization optimizationLevel)
+        {
+            // Do a first pass of constant folding
+            if (optimizationLevel.HasFlag(Optimization.ConstantFolding))
+            {
+                ExpressionTree = ExpressionTree.Fold(Compiler);
+            }
+
+            // TODO: Remove dead code for the first time
+            // TODO: Analyze the inlinability and purity of this function
+        }
+
         internal LocalVariable AddVariable(string debugName, PrimitiveType type)
         {
             var local = new LocalVariable(type, debugName + "$" + Locals.Count);

@@ -47,6 +47,33 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
+            if (Left is ConstantExpression && Right is ConstantExpression)
+            {
+                return FoldTwoConstants(compiler);
+            }
+            return this;
+        }
+
+        private Expression FoldTwoConstants(OptimizingCompiler compiler)
+        {
+            var leftConst = (ConstantExpression)Left;
+            var rightConst = (ConstantExpression)Right;
+
+            if (InternalFunctionId == InternalFunction.Plus)
+            {
+                // The parameters may be either all integers, in which case the result is an integer,
+                // or all floats / mixed, in which case the result is a floating-point value.
+                if (leftConst.Type == PrimitiveType.Int && rightConst.Type == PrimitiveType.Int)
+                {
+                    return new ConstantExpression((long)leftConst.Value + (long)rightConst.Value, compiler, Store);
+                }
+                else
+                {
+                    return new ConstantExpression(Convert.ToDouble(leftConst.Value) + Convert.ToDouble(rightConst.Value), compiler, Store);
+                }
+            }
+            // TODO: Implement more
+
             return this;
         }
     }

@@ -47,6 +47,7 @@
     <Compile Include="Compiler\CompilerTests.Analysis.cs" />
     <Compile Include="Compiler\CompilerTests.SimpleModules.cs" />
     <Compile Include="Compiler\Optimizing\CodeGeneratorPeisikTests.cs" />
+    <Compile Include="Compiler\Optimizing\BinaryExpressionTests.cs" />
     <Compile Include="Compiler\Optimizing\ExpressionTests.cs" />
     <Compile Include="Compiler\Optimizing\OptimizingCompilerTests.cs" />
     <Compile Include="Compiler\Optimizing\ErrorTests.cs" />

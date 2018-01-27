@@ -17,6 +17,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
+            // CODE SMELL: Immutability violation
+            for (var i = 0; i < Expressions.Count; i++)
+                Expressions[i] = Expressions[i].Fold(compiler);
+
             return this;
         }
     }

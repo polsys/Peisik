@@ -155,6 +155,69 @@ end";
         }
 
         [Test]
+        public void IntLiteralPromotedToReal_Constant()
+        {
+            // The parser actually makes sure '1' is parsed as a Real, but having this test for completeness.
+            var source = @"
+private real Value 1
+
+public real Main()
+begin
+  return Value
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            var disasm = @"Real main() [0 locals]
+PushConst   $literal_1r
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void IntLiteralPromotedToReal_FunctionParameter()
+        {
+            // FIXME: I have no idea where this test belongs.
+
+            var source = @"
+private void Function(real a)
+begin
+end
+
+public void Main()
+begin
+  Function(1)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+            
+            var disasm = @"Void main() [0 locals]
+PushConst   $literal_1r
+Call        function
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void IntLiteralPromotedToReal_LocalOps()
+        {
+            // FIXME: I have no idea where this test belongs.
+            var source = @"
+public real Main()
+begin
+  real value 1
+  value = 2
+  return value
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            var disasm = @"Real main() [1 locals]
+PushConst   $literal_1r
+PopLocal    value$1
+PushConst   $literal_2r
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
         public void Optimization_ConstantFolding()
         {
             var source = @"

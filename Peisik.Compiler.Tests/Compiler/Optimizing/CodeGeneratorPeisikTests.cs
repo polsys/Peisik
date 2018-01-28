@@ -105,6 +105,41 @@ Return";
         }
 
         [Test]
+        public void FunctionCall_AssignsResult()
+        {
+            var source = @"
+public int GetValue()
+begin
+  return 42
+end
+
+public int Main()
+begin
+  int local GetValue()
+  if ==(local, 42)
+  begin
+    return local
+  end
+  return 0
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Int main() [1 locals]
+Call        getvalue
+PopLocal    local$1
+PushLocal   local$1
+PushConst   $literal_42
+CallI2      Equal
+JumpFalse   +3
+PushLocal   local$1
+Return
+PushConst   $literal_0
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
         public void FunctionCall_ConstantParameters()
         {
             var source = @"
@@ -368,6 +403,7 @@ end";
 
             Assert.That(program.Functions[program.MainFunctionIndex].FullName, Is.EqualTo("main"));
         }
+
         [TestCase(Optimization.None)]
         [TestCase(Optimization.Full)]
         public void ParametersAreCorrectlyPassed(Optimization optimizationLevel)
@@ -392,6 +428,8 @@ end";
             Assert.That(function.Locals[0].name, Does.StartWith("a"));
             Assert.That(function.Locals[1].name, Does.StartWith("b"));
             Assert.That(function.Locals[2].name, Does.StartWith("c"));
+
+            Assert.That(function.ParameterTypes, Has.Exactly(3).Items);
         }
 
         [Test]

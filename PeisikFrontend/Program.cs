@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using Polsys.Peisik;
 using Polsys.Peisik.Compiler;
+using Polsys.Peisik.Compiler.Optimizing;
 using Polsys.Peisik.Parser;
 
 namespace Polsys.PeisikFrontend
@@ -14,6 +15,8 @@ namespace Polsys.PeisikFrontend
         {
             // Parse the command line arguments
             var disassembly = false;
+            var legacyCompiler = false;
+            var optimize = false;
             var timing = false;
             var showHelp = args.Length == 0;
             var modules = new List<string>();
@@ -27,6 +30,14 @@ namespace Polsys.PeisikFrontend
                 else if (argInLower == "--help")
                 {
                     showHelp = true;
+                }
+                else if (argInLower == "--legacy")
+                {
+                    legacyCompiler = true;
+                }
+                else if (argInLower == "--optimize" || argInLower == "-o")
+                {
+                    optimize = true;
                 }
                 else if (argInLower == "--timing")
                 {
@@ -43,9 +54,12 @@ namespace Polsys.PeisikFrontend
                 Console.WriteLine("The Peisik compiler");
                 Console.WriteLine("Usage: peisikc [modules] [parameters]");
                 Console.WriteLine("Possible parameters:");
-                Console.WriteLine(" --disasm Print bytecode disassembly for each module.");
-                Console.WriteLine(" --help   Show this help.");
-                Console.WriteLine(" --timing Print compilation times.");
+                Console.WriteLine(" --disasm   Print bytecode disassembly for each module.");
+                Console.WriteLine(" --help     Show this help.");
+                Console.WriteLine(" --legacy   Use the legacy non-optimizing compiler.");
+                Console.WriteLine(" --optimize Optimize code. (No effect when used with --legacy.)");
+                Console.WriteLine("  -o");
+                Console.WriteLine(" --timing   Print compilation times.");
                 return;
             }
 
@@ -59,7 +73,7 @@ namespace Polsys.PeisikFrontend
                     moduleNameWithExt = moduleName + ".peisik";
 
                 var moduleTime = Stopwatch.StartNew();
-                var module = CompileModule(moduleNameWithExt);
+                var module = CompileModule(moduleNameWithExt, legacyCompiler, optimize);
                 moduleTime.Stop();
                 if (timing)
                 {
@@ -82,7 +96,7 @@ namespace Polsys.PeisikFrontend
             }
         }
 
-        private static CompiledProgram CompileModule(string filename)
+        private static CompiledProgram CompileModule(string filename, bool legacyCompiler, bool optimize)
         {
             Console.WriteLine("-- Compiling module " + filename);
 
@@ -123,10 +137,7 @@ namespace Polsys.PeisikFrontend
                     var finalModules = new List<ModuleSyntax>(modules.Count + 1);
                     finalModules.Add(mainModule);
                     finalModules.AddRange(modules.Values);
-                    var compiler = new SemanticCompiler(finalModules);
-                    (var program, var compilerDiags) = compiler.Compile();
-
-                    PrintDiagnostics(compilerDiags);
+                    CompiledProgram program = legacyCompiler ? CompileLegacy(finalModules) : CompileOptimized(finalModules, optimize);
                     if (program == null)
                         return null;
 
@@ -143,6 +154,25 @@ namespace Polsys.PeisikFrontend
                 Console.WriteLine(e.Message);
                 return null;
             }
+        }
+
+        private static CompiledProgram CompileLegacy(List<ModuleSyntax> finalModules)
+        {
+            var compiler = new SemanticCompiler(finalModules);
+            (var program, var compilerDiags) = compiler.Compile();
+
+            PrintDiagnostics(compilerDiags);
+            return program;
+        }
+
+        private static CompiledProgram CompileOptimized(List<ModuleSyntax> finalModules, bool optimize)
+        {
+            var optimizations = optimize ? Optimization.Full : Optimization.None;
+            var compiler = new OptimizingCompiler(finalModules, optimizations);
+            (var program, var compilerDiags) = compiler.Compile();
+
+            PrintDiagnostics(compilerDiags);
+            return program;
         }
 
         private static void DisassembleModule(CompiledProgram module)

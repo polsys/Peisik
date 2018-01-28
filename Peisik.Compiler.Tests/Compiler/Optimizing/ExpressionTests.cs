@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using NUnit.Framework;
+using Polsys.Peisik.Compiler;
 using Polsys.Peisik.Compiler.Optimizing;
 
 namespace Polsys.Peisik.Tests.Compiler.Optimizing
@@ -33,6 +34,15 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             var call = new FunctionCallExpression(callee, new List<Expression>(), false, null);
 
             Assert.That(call.Type, Is.EqualTo(PrimitiveType.Int));
+        }
+
+        [Test]
+        public void UnaryExpression_Type()
+        {
+            var constant = new ConstantExpression(2.1, null);
+            var unary = new UnaryExpression(InternalFunctions.Functions["math.ceil"], constant);
+
+            Assert.That(unary.Type, Is.EqualTo(PrimitiveType.Int));
         }
     }
 }

@@ -237,6 +237,30 @@ Return";
         }
 
         [Test]
+        public void InternalCall_Unary_Store()
+        {
+            var source = @"
+public int Main()
+begin
+  int a -(5)
+  print(a)
+  return a
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Int main() [1 locals]
+PushConst   $literal_5
+CallI1      Minus
+PopLocal    a$1
+PushLocal   a$1
+CallI1      Print
+PushLocal   a$1
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
         public void InternalCall_Binary()
         {
             var source = @"
@@ -251,6 +275,31 @@ end";
 PushConst   $literal_5
 PushConst   $literal_1
 CallI2      Minus
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void InternalCall_Binary_Store()
+        {
+            var source = @"
+public int Main()
+begin
+  int a -(5, 1)
+  print(a)
+  return a
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Int main() [1 locals]
+PushConst   $literal_5
+PushConst   $literal_1
+CallI2      Minus
+PopLocal    a$1
+PushLocal   a$1
+CallI1      Print
+PushLocal   a$1
 Return";
             VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
         }
@@ -445,6 +494,68 @@ end";
             var disasm = @"Void main() [0 locals]
 Return";
             VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void While_SimpleLoop()
+        {
+            var source = @"
+private bool Main()
+begin
+  while false
+  begin
+    return false
+  end
+  return true
+end";
+            var program = CompileSingleFunction(source);
+
+            var dis = @"
+Bool main() [0 locals]
+PushConst   $literal_false
+JumpFalse   +4
+PushConst   $literal_false
+Return
+Jump        -4
+PushConst   $literal_true
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, dis);
+        }
+
+        [Test]
+        public void While_RealisticLoop()
+        {
+            var source = @"
+private int Main()
+begin
+  int i 0
+  while <(i, 5)
+  begin
+    i = +(i, 1)
+    print(i)
+  end
+  return i
+end";
+            var program = CompileSingleFunction(source);
+
+            var dis = @"
+Int main() [1 locals]
+PushConst   $literal_0
+PopLocal    i$1
+PushLocal   i$1
+PushConst   $literal_5
+CallI2      Less
+JumpFalse   +8
+PushLocal   i$1
+PushConst   $literal_1
+CallI2      Plus
+PopLocal    i$1
+PushLocal   i$1
+CallI1      Print
+Jump        -10
+PushLocal   i$1
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, dis);
         }
     }
 }

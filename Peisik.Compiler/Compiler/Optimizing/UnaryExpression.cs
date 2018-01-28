@@ -12,8 +12,28 @@
         public UnaryExpression(InternalFunctionDefinition func, Expression parameter)
         {
             Expression = parameter;
-            Type = Expression.Type;
             InternalFunctionId = func.Index;
+
+            switch (func.ReturnType)
+            {
+                case InternalReturnType.Bool:
+                    Type = PrimitiveType.Bool;
+                    break;
+                case InternalReturnType.Int:
+                    Type = PrimitiveType.Int;
+                    break;
+                case InternalReturnType.Real:
+                    Type = PrimitiveType.Real;
+                    break;
+                case InternalReturnType.RealOrInt:
+                case InternalReturnType.SameAsParameter:
+                    Type = Expression.Type;
+                    break;
+                case InternalReturnType.Void:
+                default:
+                    Type = PrimitiveType.Void;
+                    break;
+            }
         }
 
         public override Expression Fold(OptimizingCompiler compiler)

@@ -69,7 +69,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             if (syntax is AssignmentSyntax assign)
             {
-                // First check for the assignment to const error case
+                // First check for the 'assignment to const' error case
                 if (compiler.TryGetConstant(assign.Target, function.ModulePrefix, out _))
                 {
                     compiler.LogError(DiagnosticCode.MayNotAssignToConst, assign.Position, assign.Target);
@@ -78,6 +78,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 // Then do the actual assignment (with implicit error checks)
                 var local = localContext.GetLocal(assign.Target, assign.Position);
                 var expr = FromSyntax(assign.Expression, function, compiler, localContext);
+                
+                // Promote integer LITERALS to reals (parser deficiency)
+                if (expr.Type == PrimitiveType.Int && local.Type == PrimitiveType.Real
+                    && assign.Expression is LiteralSyntax initialValue)
+                {
+                    expr = new ConstantExpression(Convert.ToDouble(initialValue.Value), compiler);
+                }
+
                 expr.SetStore(local, compiler, assign.Position);
 
                 return expr;
@@ -116,8 +124,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
                         // Check that the expected and actual types match
                         var paramExpr = FromSyntax(call.Parameters[i], function, compiler, localContext);
                         if (paramExpr.Type != callee.ParameterTypes[i])
-                            compiler.LogError(DiagnosticCode.WrongType, call.Parameters[i].Position,
-                                paramExpr.Type.ToString(), callee.ParameterTypes[i].ToString());
+                        {
+                            // However, there is one exception: int LITERALS may be interpreted as reals
+                            if (paramExpr.Type == PrimitiveType.Int &&
+                                callee.ParameterTypes[i] == PrimitiveType.Real &&
+                                call.Parameters[i] is LiteralSyntax literal)
+                            {
+                                paramExpr = new ConstantExpression(Convert.ToDouble(literal.Value), compiler);
+                            }
+                            else
+                            {
+                                compiler.LogError(DiagnosticCode.WrongType, call.Parameters[i].Position,
+                                    paramExpr.Type.ToString(), callee.ParameterTypes[i].ToString());
+                            }
+                        }
 
                         parameters.Add(paramExpr);
                     }
@@ -175,6 +195,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 var local = localContext.AddLocal(decl.Name, decl.Type, decl.Position);
                 var result = FromSyntax(decl.InitialValue, function, compiler, localContext);
+
+                // Promote integer LITERALS to reals (parser deficiency)
+                if (result.Type == PrimitiveType.Int && local.Type == PrimitiveType.Real
+                    && decl.InitialValue is LiteralSyntax initialValue)
+                {
+                    result = new ConstantExpression(Convert.ToDouble(initialValue.Value), compiler);
+                }
+
                 result.SetStore(local, compiler, decl.Position);
                 return result;
             }

@@ -50,6 +50,9 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     continue;
                 local.LocalIndex = compiled.Locals.Count;
                 compiled.AddLocal(local.Name, local.Type);
+
+                if (local.IsParameter)
+                    compiled.ParameterTypes.Add(local.Type);
             }
 
             // Then compile the code
@@ -129,6 +132,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 compiled.Bytecode.Add(new BytecodeOp(Opcode.PopDiscard, 0));
             }
+
+            // If the result is stored, store it
+            if (call.Store != null)
+                EmitStore(call.Store, compiled);
         }
 
         private void CompileIf(IfExpression cond, Function function, CompiledFunction compiled)

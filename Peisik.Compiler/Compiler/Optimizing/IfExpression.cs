@@ -20,7 +20,19 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
-            return new IfExpression(Condition.Fold(compiler), ThenExpression.Fold(compiler), ElseExpression.Fold(compiler));
+            Expression condition = Condition.Fold(compiler);
+
+            // If the condition is always true or false, omit the unused part
+            if (condition is ConstantExpression constant && constant.Value is bool value)
+            {
+                if (value)
+                    return ThenExpression.Fold(compiler);
+                else
+                    return ElseExpression.Fold(compiler);
+            }
+
+            // Else, just fold as much as possible
+            return new IfExpression(condition, ThenExpression.Fold(compiler), ElseExpression.Fold(compiler));
         }
     }
 }

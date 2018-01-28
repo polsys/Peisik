@@ -364,7 +364,7 @@ end";
             var source = @"
 public int Main()
 begin
-  if ==(1, 1)
+  if ==(Math.Cos(2), 0.5)
   begin
     return +(1, 99)
   end
@@ -378,20 +378,73 @@ end";
 
             // After constant folding, the expression tree should be
             // If
-            //   | -- ConstantExpression (true)
+            //   | -- BinaryExpression (...)
             //   | -- ReturnExpression (ConstantExpression 100)
             //   | -- ReturnExpression (ConstantExpression 0)
             Assert.That(function.ExpressionTree, Is.InstanceOf<IfExpression>());
             var cond = (IfExpression)function.ExpressionTree;
 
-            Assert.That(cond.Condition, Is.InstanceOf<ConstantExpression>());
-            Assert.That(((ConstantExpression)cond.Condition).Value, Is.EqualTo(true));
+            Assert.That(cond.Condition, Is.InstanceOf<BinaryExpression>());
 
             Assert.That(cond.ThenExpression, Is.InstanceOf<ReturnExpression>());
             Assert.That(((ReturnExpression)cond.ThenExpression).Value, Is.InstanceOf<ConstantExpression>());
 
             Assert.That(cond.ElseExpression, Is.InstanceOf<ReturnExpression>());
             Assert.That(((ReturnExpression)cond.ElseExpression).Value, Is.InstanceOf<ConstantExpression>());
+        }
+
+        [Test]
+        public void ConstantFolding_InIf_AlwaysTrue()
+        {
+            var source = @"
+public int Main()
+begin
+  if ==(1, 1)
+  begin
+    return +(1, 99)
+  end
+  else
+  begin
+    return +(-1, 1)
+  end
+end";
+            var function = SingleFunctionFromSyntax(source);
+            function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
+
+            // After constant folding, the expression tree should be
+            // ReturnExpression (ConstantExpression 100)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)function.ExpressionTree;
+
+            Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)ret.Value).Value, Is.EqualTo(100L));
+        }
+
+        [Test]
+        public void ConstantFolding_InIf_AlwaysFalse()
+        {
+            var source = @"
+public int Main()
+begin
+  if ==(1, 2)
+  begin
+    return +(1, 99)
+  end
+  else
+  begin
+    return +(-1, 1)
+  end
+end";
+            var function = SingleFunctionFromSyntax(source);
+            function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
+
+            // After constant folding, the expression tree should be
+            // ReturnExpression (ConstantExpression 0)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)function.ExpressionTree;
+
+            Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)ret.Value).Value, Is.EqualTo(0L));
         }
     }
 }

@@ -77,11 +77,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     CompileExpression(binary.Left, function, compiled);
                     CompileExpression(binary.Right, function, compiled);
                     compiled.Bytecode.Add(new BytecodeOp(Opcode.CallI2, (short)binary.InternalFunctionId));
+                    EmitStore(binary.Store, compiled);
                     break;
                 case ConstantExpression c:
                     EmitPush(c, compiled);
-                    if (c.Store != null)
-                        EmitStore(c.Store, compiled);
+                    EmitStore(c.Store, compiled);
                     break;
                 case FailFastExpression _:
                     compiled.Bytecode.Add(new BytecodeOp(Opcode.CallI0, (short)InternalFunction.FailFast));
@@ -94,8 +94,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     break;
                 case LocalLoadExpression load:
                     EmitPush(load.Local, compiled);
-                    if (load.Store != null)
-                        EmitStore(load.Store, compiled);
+                    EmitStore(load.Store, compiled);
                     break;
                 case PrintExpression print:
                     CompilePrint(print, function, compiled);
@@ -110,6 +109,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 case UnaryExpression unary:
                     CompileExpression(unary.Expression, function, compiled);
                     compiled.Bytecode.Add(new BytecodeOp(Opcode.CallI1, (short)unary.InternalFunctionId));
+                    EmitStore(unary.Store, compiled);
+                    break;
+                case WhileExpression loop:
+                    CompileWhile(loop, function, compiled);
                     break;
                 default:
                     throw new NotImplementedException($"Unhandled expression type {expression}");
@@ -134,8 +137,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
 
             // If the result is stored, store it
-            if (call.Store != null)
-                EmitStore(call.Store, compiled);
+            EmitStore(call.Store, compiled);
         }
 
         private void CompileIf(IfExpression cond, Function function, CompiledFunction compiled)
@@ -200,9 +202,35 @@ namespace Polsys.Peisik.Compiler.Optimizing
             compiled.Bytecode.Add(new BytecodeOp(Opcode.Return, 0));
         }
 
+        private void CompileWhile(WhileExpression loop, Function function, CompiledFunction compiled)
+        {
+            // Emit the condition check
+            var startPosition = compiled.Bytecode.Count;
+            CompileExpression(loop.Condition, function, compiled);
+
+            // If the condition is false, jump to the end
+            // We just don't know the jump target yet
+            var exitJumpPosition = compiled.Bytecode.Count;
+            compiled.Bytecode.Add(new BytecodeOp(Opcode.Invalid, 0));
+
+            // Emit the loop body
+            CompileExpression(loop.Body, function, compiled);
+
+            // Emit a jump back to the condition
+            var bodyLength = compiled.Bytecode.Count - exitJumpPosition;
+            var conditionLength = exitJumpPosition - startPosition + 1;
+            compiled.Bytecode.Add(new BytecodeOp(Opcode.Jump, (short)(1 - bodyLength - conditionLength)));
+
+            // Fix up the exit jump
+            compiled.Bytecode[exitJumpPosition] = new BytecodeOp(Opcode.JumpFalse, (short)(bodyLength + 1));
+        }
+
         private void EmitStore(LocalVariable target, CompiledFunction compiled)
         {
-            compiled.Bytecode.Add(new BytecodeOp(Opcode.PopLocal, (short)target.LocalIndex));
+            if (target != null)
+            {
+                compiled.Bytecode.Add(new BytecodeOp(Opcode.PopLocal, (short)target.LocalIndex));
+            }
         }
 
         private void EmitPush(LocalVariable local, CompiledFunction compiled)

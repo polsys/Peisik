@@ -206,6 +206,16 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 result.SetStore(local, compiler, decl.Position);
                 return result;
             }
+            else if (syntax is WhileSyntax loop)
+            {
+                var condition = FromSyntax(loop.Condition, function, compiler, localContext);
+                if (condition.Type != PrimitiveType.Bool)
+                    compiler.LogError(DiagnosticCode.WrongType, loop.Condition.Position, condition.Type.ToString(), "Bool");
+
+                var body = FromSyntax(loop.CodeBlock, function, compiler, localContext);
+
+                return new WhileExpression(condition, body);
+            }
             else
             {
                 throw new NotImplementedException($"Unimplemented syntax {syntax}");

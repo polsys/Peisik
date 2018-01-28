@@ -336,6 +336,44 @@ end";
         }
 
         [Test]
+        public void WhileExpression()
+        {
+            var source = @"
+public void Main()
+begin
+  int i 0
+  while <(i, 5)
+  begin
+    i = +(i, 1)
+  end
+end";
+            var function = SingleFunctionFromSyntax(source);
+
+            // The expression tree should be
+            // (root)
+            //   |-- ConstantExpression (0) -> i
+            //   |-- WhileExpression
+            //       | -- BinaryExpression (...)
+            //       |
+            //       | -- SequenceExpression
+            //            | -- BinaryExpression (...)
+            //   |-- ReturnExpression
+            Assert.That(function.ExpressionTree, Is.InstanceOf<SequenceExpression>());
+            var sequence = (SequenceExpression)function.ExpressionTree;
+            Assert.That(sequence.Expressions, Has.Exactly(3).Items);
+            Assert.That(sequence.Expressions[0], Is.InstanceOf<ConstantExpression>());
+            Assert.That(sequence.Expressions[2], Is.InstanceOf<ReturnExpression>());
+
+            Assert.That(sequence.Expressions[1], Is.InstanceOf<WhileExpression>());
+            var loop = (WhileExpression)sequence.Expressions[1];
+            Assert.That(loop.Condition, Is.InstanceOf<BinaryExpression>());
+            Assert.That(loop.Condition.Type, Is.EqualTo(PrimitiveType.Bool));
+
+            Assert.That(loop.Body, Is.InstanceOf<SequenceExpression>());
+            Assert.That(((SequenceExpression)loop.Body).Expressions, Has.Exactly(1).Items);
+        }
+
+        [Test]
         public void ConstantFolding_BinaryExpression()
         {
             var source = @"

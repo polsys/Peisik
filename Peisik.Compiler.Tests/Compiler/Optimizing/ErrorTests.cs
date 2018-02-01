@@ -2,6 +2,7 @@
 using NUnit.Framework;
 using Polsys.Peisik.Parser;
 using Polsys.Peisik.Compiler.Optimizing;
+using System.IO;
 
 namespace Polsys.Peisik.Tests.Compiler.Optimizing
 {
@@ -251,6 +252,20 @@ end";
         }
 
         [Test]
+        public void MainMayNotHaveParameters()
+        {
+            var source = @"
+public int Main(int Param)
+begin
+  return Param
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.MainMayNotHaveParameters));
+        }
+
+        [Test]
         public void MismatchingTypesInAssignment()
         {
             var source = @"
@@ -347,6 +362,30 @@ end";
             Assert.That(diagnostics, Has.Exactly(1).Items);
             Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NameNotFound));
             Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("Something"));
+        }
+
+        [Test]
+        public void NoMainFunction()
+        {
+            var otherModule = @"
+# This must not be picked up
+public void Main()
+begin
+end";
+            var mainModule = @"
+public int SomethingElseEntirely()
+begin
+  return -1
+end";
+            var compiler = new OptimizingCompiler(new List<Peisik.Parser.ModuleSyntax>()
+            {
+                ModuleParser.Parse(new StringReader(otherModule), "", "OtherModule").module,
+                ModuleParser.Parse(new StringReader(mainModule), "", "").module
+            }, Optimization.None);
+            (var program, var diagnostics) = compiler.Compile();
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.NoMainFunction));
         }
 
         [Test]

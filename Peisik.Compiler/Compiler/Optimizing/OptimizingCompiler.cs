@@ -82,7 +82,18 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     function.AnalyzeAndOptimizePreInlining(_optimizationLevel);
                 }
 
-                // Ensure that there is a Main() function
+                // Ensure that there is a Main() function and it has no parameters
+                if (_functions.TryGetValue("main", out var mainFunction))
+                {
+                    if (mainFunction.function.ParameterTypes.Count > 0)
+                    {
+                        LogError(DiagnosticCode.MainMayNotHaveParameters, default);
+                    }
+                }
+                else
+                {
+                    LogError(DiagnosticCode.NoMainFunction, default);
+                }
 
                 // Run desired optimizations
                 // - inlining

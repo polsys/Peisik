@@ -49,6 +49,10 @@
     <Compile Include="Compiler\CompiledConstant.cs" />
     <Compile Include="Compiler\CompiledProgram.cs" />
     <Compile Include="Compiler\InternalFunctions.cs" />
+    <Compile Include="Compiler\Optimizing\ConstantExpression.cs" />
+    <Compile Include="Compiler\Optimizing\FunctionCallExpression.cs" />
+    <Compile Include="Compiler\Optimizing\LocalLoadExpression.cs" />
+    <Compile Include="Compiler\Optimizing\ReturnExpression.cs" />
     <Compile Include="Compiler\Optimizing\WhileExpression.cs" />
     <Compile Include="Compiler\Optimizing\IfExpression.cs" />
     <Compile Include="Compiler\Optimizing\CodeGeneratorPeisik.cs" />

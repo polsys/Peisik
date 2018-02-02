@@ -9,7 +9,6 @@ namespace Polsys.Peisik.Compiler.Optimizing
     /// </summary>
     internal class CodeGeneratorPeisik
     {
-        public CompiledProgram Result => _program;
         CompiledProgram _program = new CompiledProgram();
 
         Dictionary<string, short> _constants = new Dictionary<string, short>();
@@ -17,6 +16,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public CodeGeneratorPeisik()
         {
+        }
+
+        /// <summary>
+        /// Returns the final program.
+        /// This should only be called once all functions have been compiled.
+        /// </summary>
+        /// <returns>A reference to the final program.</returns>
+        public CompiledProgram GetProgram()
+        {
+            // Now make sure the functions are in correct order
+            _program.Functions.Sort((CompiledFunction a, CompiledFunction b) 
+                => a.FunctionTableIndex.CompareTo(b.FunctionTableIndex));
+
+            return _program;
         }
 
         /// <summary>
@@ -33,6 +46,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             // Assign function index for this function
             // If this function is Main(), also set the main function index
             var functionIndex = GetFunctionIndex(function.FullName);
+            compiled.FunctionTableIndex = functionIndex;
             if (function.FullName == "main")
             {
                 _program.MainFunctionIndex = functionIndex;

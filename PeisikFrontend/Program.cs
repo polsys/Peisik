@@ -98,7 +98,9 @@ namespace Polsys.PeisikFrontend
 
         private static CompiledProgram CompileModule(string filename, bool legacyCompiler, bool optimize)
         {
-            Console.WriteLine("-- Compiling module " + filename);
+            // The [optimized] tag not only makes the mode clear,
+            // but shows up in diffs between non-optimized and optimized disassembly.
+            Console.WriteLine("-- Compiling module " + filename + (optimize ? " [optimized]" : ""));
 
             try
             {

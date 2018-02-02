@@ -1,0 +1,51 @@
+# This program implements Bellard's formula for computing pi.
+# See https://en.wikipedia.org/wiki/Bellard%27s_formula for more.
+# This only computes digits within double precision, and therefore performs the computation within a loop.
+
+# This stresses especially local ops and simple arithmetic functions.
+
+import UnitTest
+
+public int Select(bool isFirst, int first, int other)
+begin
+  if isFirst
+  begin
+    return first
+  end
+  else
+  begin
+    return other
+  end
+end
+
+public real Iterate(int n)
+begin
+  # Sign = (-1)^n = (-1 when n odd, 1 when n even)
+  # A smart compiler would inline and constant-fold the Select call away
+  int sign *(-1, Select(==(%(n, 2), 0), -1, 1))
+  real factor /(sign, Math.Pow(2, *(10, n)))
+  
+  real term1 /(-32, +(*(4,n), 1))
+  real term2 /(-1, +(*(4,n), 3))
+  real term3 /(256, +(*(10,n), 1))
+  real term4 /(-64, +(*(10,n), 3))
+  real term5 /(-4, +(*(10,n), 5))
+  real term6 /(-4, +(*(10,n), 7))
+  real term7 /(1, +(*(10,n), 9))
+  
+  return *(factor, +(term1, +(term2, +(term3, +(term4, +(term5, +(term6, term7)))))))
+end
+
+private int Iterations 200000
+
+public int Main()
+begin
+  int i 0
+  while <(i, Iterations)
+  begin
+    real result /(+(+(Iterate(0), Iterate(1)), Iterate(2)), 64)
+    UnitTest.AssertReal(result, 3.14159, 0.00001)
+    i = +(i, 1)
+  end
+  return i
+end

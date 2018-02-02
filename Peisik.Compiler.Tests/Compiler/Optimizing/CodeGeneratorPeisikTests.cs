@@ -18,7 +18,7 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             var codeGen = new CodeGeneratorPeisik();
 
             codeGen.CompileFunction(function);
-            return codeGen.Result;
+            return codeGen.GetProgram();
         }
 
         [Test]
@@ -207,6 +207,35 @@ public int Main()
 begin
   DoNothing()
   return 5
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Int main() [0 locals]
+Call        donothing
+PushConst   $literal_5
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void FunctionIndices_InCorrectOrder()
+        {
+            // There was a bug where function order and indices did not match
+            // As a result, the below program would call DoSomething()
+            var source = @"
+public int Main()
+begin
+  DoNothing()
+  return 5
+end
+
+public void DoSomething()
+begin
+end
+
+public void DoNothing()
+begin
 end";
             var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
 

@@ -106,7 +106,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     codeGen.CompileFunction(function);
                 }
 
-                return (codeGen.Result, _diagnostics);
+                return (codeGen.GetProgram(), _diagnostics);
 
             }
             catch (CompilerException)

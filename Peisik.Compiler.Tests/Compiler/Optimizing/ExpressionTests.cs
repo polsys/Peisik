@@ -44,5 +44,105 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
 
             Assert.That(unary.Type, Is.EqualTo(PrimitiveType.Int));
         }
+
+        [Test]
+        public void GetGuaranteesReturn_ReturnExpression()
+        {
+            var expr = new ReturnExpression(new ConstantExpression(0L, null));
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.True);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_IfExpression_True()
+        {
+            var condition = new ConstantExpression(true, null);
+            var thenExpr = new ReturnExpression(new ConstantExpression(0L, null));
+            var elseExpr = new ReturnExpression(new ConstantExpression(1L, null));
+            var expr = new IfExpression(condition, thenExpr, elseExpr);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.True);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_IfExpression_NoElse()
+        {
+            var condition = new ConstantExpression(true, null);
+            var thenExpr = new ReturnExpression(new ConstantExpression(0L, null));
+            var expr = new IfExpression(condition, thenExpr, null);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.False);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_IfExpression_False1()
+        {
+            var condition = new ConstantExpression(true, null);
+            var thenExpr = new ConstantExpression(0L, null);
+            var elseExpr = new ReturnExpression(new ConstantExpression(1L, null));
+            var expr = new IfExpression(condition, thenExpr, elseExpr);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.False);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_IfExpression_False2()
+        {
+            var condition = new ConstantExpression(true, null);
+            var thenExpr = new ReturnExpression(new ConstantExpression(0L, null));
+            var elseExpr = new ConstantExpression(1L, null);
+            var expr = new IfExpression(condition, thenExpr, elseExpr);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.False);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_SequenceExpression_False()
+        {
+            var first = new ConstantExpression(1L, null);
+            var second = new ConstantExpression(0L, null);
+            var expr = new SequenceExpression();
+            expr.Expressions.Add(first);
+            expr.Expressions.Add(second);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.False);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_SequenceExpression_True1()
+        {
+            var first = new ConstantExpression(1L, null);
+            var second = new ReturnExpression(new ConstantExpression(0L, null));
+            var expr = new SequenceExpression();
+            expr.Expressions.Add(first);
+            expr.Expressions.Add(second);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.True);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_SequenceExpression_True2()
+        {
+            var first = new ReturnExpression(new ConstantExpression(1L, null));
+            var second = new ReturnExpression(new ConstantExpression(0L, null));
+            var expr = new SequenceExpression();
+            expr.Expressions.Add(first);
+            expr.Expressions.Add(second);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.True);
+        }
+
+        [Test]
+        public void GetGuaranteesReturn_WhileExpression_AlwaysFalse()
+        {
+            // This is just a safeguard for my idiocy.
+            // Even if the loop body was guaranteed to return, it wouldn't matter as the condition may be false.
+
+            var condition = new ConstantExpression(true, null);
+            var loop = new ReturnExpression(new ConstantExpression(0L, null));
+            var expr = new WhileExpression(condition, loop);
+
+            Assert.That(expr.GetGuaranteesReturn(), Is.False);
+        }
     }
 }

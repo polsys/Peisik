@@ -74,13 +74,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             ExpressionTree = Expression.FromSyntax(_syntaxTree.CodeBlock, this, _compiler, _localContext);
 
-            // Void functions may return implicitly, and there must be a return expression in the end
-            // TODO: Refactor this check once the guaranteed return check is in place
-            List<Expression> expressions = ((SequenceExpression)ExpressionTree).Expressions;
-            if (ResultValue.Type == PrimitiveType.Void &&
-                (expressions.Count == 0 || !(expressions[expressions.Count - 1] is ReturnExpression)))
+            // Ensure that the function returns
+            var guaranteedReturn = ExpressionTree.GetGuaranteesReturn();
+            if (!guaranteedReturn)
             {
-                ((SequenceExpression)ExpressionTree).Expressions.Add(new ReturnExpression(null));
+                if (ResultValue.Type == PrimitiveType.Void)
+                {
+                    // Void functions are allowed to return implicitly
+                    // Just stick a return expression in the end
+                    ((SequenceExpression)ExpressionTree).Expressions.Add(new ReturnExpression(null));
+                }
+                else
+                {
+                    Compiler.LogError(DiagnosticCode.ReturnNotGuaranteed, default, FullName);
+                }
             }
         }
 

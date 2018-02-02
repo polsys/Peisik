@@ -114,6 +114,8 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 case WhileExpression loop:
                     CompileWhile(loop, function, compiled);
                     break;
+                case null:
+                    break; // Well that was simple to emit.
                 default:
                     throw new NotImplementedException($"Unhandled expression type {expression}");
             }

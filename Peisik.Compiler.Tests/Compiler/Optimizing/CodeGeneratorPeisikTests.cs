@@ -557,5 +557,31 @@ PushLocal   i$1
 Return";
             VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, dis);
         }
+
+        [Test]
+        public void While_EmptyLoop_Folded()
+        {
+            var source = @"
+private bool Main()
+begin
+  while ==(0.123, Math.Cos(0.456))
+  begin
+  end
+  return true
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.ConstantFolding);
+
+            var dis = @"
+Bool main() [0 locals]
+PushConst   $literal_0.123r
+PushConst   $literal_0.456r
+CallI1      MathCos
+CallI2      Equal
+JumpFalse   +2
+Jump        -5
+PushConst   $literal_true
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, dis);
+        }
     }
 }

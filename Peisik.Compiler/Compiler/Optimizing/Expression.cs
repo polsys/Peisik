@@ -52,6 +52,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
         }
 
         /// <summary>
+        /// Returns true if this expression is guaranteed to return.
+        /// Users should call this on the function expression tree root.
+        /// </summary>
+        /// <remarks>
+        /// Of course, this does not prove that the expression always returns -
+        /// that is a NP-hard problem. This proves that a return node is always accessible.
+        /// </remarks>
+        /// <returns>True if this expression always returns, false if not.</returns>
+        public virtual bool GetGuaranteesReturn()
+        {
+            return false;
+        }
+
+        /// <summary>
         /// If this expression uses the local assigned to in <paramref name="assignment"/>,
         /// replace the local load with the assignment expression.
         /// </summary>

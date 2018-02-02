@@ -27,20 +27,32 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
         }
 
+        public SequenceExpression(List<Expression> expressions)
+        {
+            Expressions = expressions;
+        }
+
         public override Expression Fold(OptimizingCompiler compiler)
         {
-            // If this sequence has only 1 item, stop being a sequence
-            if (Expressions.Count == 1)
-            {
-                return Expressions[0].Fold(compiler);
-            }
-
-            // CODE SMELL: And here we violate our kind-of qimmutability...
+            var newList = new List<Expression>();
             for (var i = 0; i < Expressions.Count; i++)
             {
-                Expressions[i] = Expressions[i].Fold(compiler);
+                var foldedExpr = Expressions[i].Fold(compiler);
+                if (foldedExpr != null)
+                    newList.Add(foldedExpr);
             }
-            return this;
+
+            // If this sequence has only 1 item, stop being a sequence
+            // If there are no items at all, stop being anything (this must be handled by callers)
+            if (newList.Count == 0)
+            {
+                return null;
+            }
+            if (newList.Count == 1)
+            {
+                return newList[0];
+            }
+            return new SequenceExpression(newList);
         }
 
         public override void FoldSingleUseLocals()
@@ -72,6 +84,17 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     }
                 }
             }
+        }
+
+        public override bool GetGuaranteesReturn()
+        {
+            // Loop through expressions and return true as soon as a return is found
+            foreach (var expr in Expressions)
+            {
+                if (expr.GetGuaranteesReturn())
+                    return true;
+            }
+            return false;
         }
     }
 }

@@ -389,6 +389,24 @@ end";
         }
 
         [Test]
+        public void ReturnNotGuaranteed()
+        {
+            var source = @"
+public int Main()
+begin
+  if false
+  begin
+    return 1
+  end
+end";
+            (var _, var diagnostics) = CompileOptimizedWithDiagnostics(source, Optimization.None);
+
+            Assert.That(diagnostics, Has.Exactly(1).Items);
+            Assert.That(diagnostics[0].Diagnostic, Is.EqualTo(DiagnosticCode.ReturnNotGuaranteed));
+            Assert.That(diagnostics[0].AssociatedToken, Is.EqualTo("main"));
+        }
+
+        [Test]
         public void While_NonBoolCondition()
         {
             var source = @"

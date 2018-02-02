@@ -1,0 +1,45 @@
+# This program implements the Fermat primality test.
+# It is one of the more realistic benchmarks.
+# It stresses local ops, internal calls and flow control.
+
+import UnitTest
+
+public int ModPow(int n, int power, int modulus)
+begin
+    int i 0
+    int result 1
+    while <(i, power)
+    begin
+        result = %(*(result, n), modulus)
+        i = +(i, 1)
+    end
+    
+    return result
+end
+
+public bool IsProbablePrime(int n)
+begin
+    if !=(ModPow(2, -(n, 1), n), 1)
+    begin
+        return false
+    end
+    if !=(ModPow(3, -(n, 1), n), 1)
+    begin
+        return false
+    end
+    if !=(ModPow(5, -(n, 1), n), 1)
+    begin
+        return false
+    end
+    return true
+end
+
+public void Main()
+begin
+    UnitTest.AssertTrue(IsProbablePrime(7))
+    UnitTest.AssertFalse(IsProbablePrime(14))
+    UnitTest.AssertTrue(IsProbablePrime(103))
+    UnitTest.AssertFalse(IsProbablePrime(341)) # Pseudoprime for base 2 but not base 3
+    UnitTest.AssertTrue(IsProbablePrime(75361)) # Pseudoprime for all relevant bases
+    UnitTest.AssertTrue(IsProbablePrime(2750159)) # 200000th prime
+end

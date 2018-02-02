@@ -27,6 +27,11 @@
                 return this;
         }
 
+        public override bool GetGuaranteesReturn()
+        {
+            return true;
+        }
+
         internal override Expression TryInlineLocalAssignment(Expression assignment)
         {
             if (Value is LocalLoadExpression load && load.Local == assignment.Store)

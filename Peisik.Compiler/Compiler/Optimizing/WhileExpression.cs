@@ -18,7 +18,17 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
-            return this;
+            // Omit always-false loops altogether
+            var foldedCondition = Condition.Fold(compiler);
+            if (foldedCondition is ConstantExpression constantCondition && constantCondition.Value is bool value)
+            {
+                if (value == false)
+                {
+                    return null;
+                }
+            }
+            
+            return new WhileExpression(Condition.Fold(compiler), Body.Fold(compiler));
         }
     }
 }

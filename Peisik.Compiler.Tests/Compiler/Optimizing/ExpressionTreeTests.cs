@@ -432,6 +432,30 @@ end";
         }
 
         [Test]
+        public void ConstantFolding_InIf_NoElse()
+        {
+            var source = @"
+public int Main()
+begin
+  if false
+  begin
+    return +(1, 99)
+  end
+  return 2
+end";
+            var function = SingleFunctionFromSyntax(source);
+            function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
+
+            // After constant folding, the expression tree should be
+            // ReturnExpression (ConstantExpression 2)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)function.ExpressionTree;
+
+            Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)ret.Value).Value, Is.EqualTo(2L));
+        }
+
+        [Test]
         public void ConstantFolding_InIf_AlwaysTrue()
         {
             var source = @"
@@ -472,6 +496,29 @@ begin
   begin
     return +(-1, 1)
   end
+end";
+            var function = SingleFunctionFromSyntax(source);
+            function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);
+
+            // After constant folding, the expression tree should be
+            // ReturnExpression (ConstantExpression 0)
+            Assert.That(function.ExpressionTree, Is.InstanceOf<ReturnExpression>());
+            var ret = (ReturnExpression)function.ExpressionTree;
+
+            Assert.That(ret.Value, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)ret.Value).Value, Is.EqualTo(0L));
+        }
+
+        [Test]
+        public void ConstantFolding_InWhile_EmptyLoop()
+        {
+            var source = @"
+public int Main()
+begin
+  while false
+  begin
+  end
+  return 0
 end";
             var function = SingleFunctionFromSyntax(source);
             function.AnalyzeAndOptimizePreInlining(Optimization.ConstantFolding);

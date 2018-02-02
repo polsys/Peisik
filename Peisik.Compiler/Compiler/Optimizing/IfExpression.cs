@@ -34,5 +34,23 @@ namespace Polsys.Peisik.Compiler.Optimizing
             // Else, just fold as much as possible
             return new IfExpression(condition, ThenExpression.Fold(compiler), ElseExpression.Fold(compiler));
         }
+
+        public override bool GetGuaranteesReturn()
+        {
+            // Both the 'then' and 'else' blocks must return
+            // Whether the condition is constant does not matter here
+            var result = ThenExpression.GetGuaranteesReturn();
+            if (ElseExpression != null)
+            {
+                result = result && ElseExpression.GetGuaranteesReturn();
+            }
+            else
+            {
+                // The 'else' cannot return if it does not exist
+                return false;
+            }
+
+            return result;
+        }
     }
 }

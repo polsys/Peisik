@@ -1,6 +1,6 @@
 @echo off
 
-set __Files=Warmup BuiltinTest MonteCarloPi Trig Swap Fibonacci FermatPrimality BellardPi Sum_NoTail Sum_Tail
+set __Files=Warmup BuiltinTest MonteCarloPi Trig Swap Fibonacci FermatPrimality BellardPi Binomial Sum_NoTail Sum_Tail
 set __Countops=
 set __Optimize=-O
 

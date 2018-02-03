@@ -1,0 +1,150 @@
+# This program computes binomial coefficients with various formulae,
+# then checks the results against each other and row sums.
+
+# This stresses especially local ops and simple arithmetic functions.
+# Many functions are suitable for inlining and constant folding.
+
+import UnitTest
+
+# Returns n!
+# This is implemented using the recursive formula.
+private int Factorial(int n)
+begin
+    # This assumes that n >= 0.
+    if <=(n, 1)
+    begin
+        return 1
+    end
+    return *(n, Factorial(-(n, 1)))
+end
+
+# Returns n!/(n-k)!, or number of ways to order k objects out of n total.
+# This is implemented using the iterative formula.
+private int KPermutation(int n, int k)
+begin
+    int result 1
+    int nMinusK -(n, k)
+    while >(n, nMinusK)
+    begin
+        result = *(result, n)
+        n = -(n, 1)
+    end
+    return result
+end
+
+# Uses the inefficient factorial form n!/(k!(n-k!))
+private int SimpleBinomial(int n, int k)
+begin
+    int nFact Factorial(n)
+    int kFact Factorial(k)
+    int nkFact Factorial(-(n, k))
+
+    return //(nFact, *(kFact, nkFact))
+end
+
+# Similar to SimpleBinomial, but computes less factorials.
+private int EfficientBinomial(int n, int k)
+begin  
+    int nkPerm KPermutation(n, k)
+    int kFact Factorial(k)
+
+    return //(nkPerm, kFact)
+end
+
+# Uses the fact that Binom(n, k) = Binom(n-1, k-1) + Binom(n-1, k).
+# The terms are not calculated using this recurrence relation only,
+# because that would dominate the time cost. Instead, the other
+# two methods are used.
+private int RecursiveBinomial(int n, int k)
+begin
+    if <(n, k)
+    begin
+    FailFast()
+    end
+
+    if or(==(k, 0), ==(k, n))
+    begin
+      return 1
+    end
+    
+    return +(EfficientBinomial(-(n, 1), -(k, 1)), SimpleBinomial(-(n, 1), k))
+end
+
+# Returns 2^n.
+# This would be trivial if the language contained a left shift operation.
+private int TwoTo(int n)
+begin
+  if >(n, 31)
+  begin
+    FailFast()
+  end
+  
+  int result 1
+  
+  if !=(and(n, 16), 0)
+  begin
+    result = *(result, 65536)
+  end
+  if !=(and(n, 8), 0)
+  begin
+    result = *(result, 256)
+  end
+  if !=(and(n, 4), 0)
+  begin
+    result = *(result, 16)
+  end
+  if !=(and(n, 2), 0)
+  begin
+    result = *(result, 4)
+  end
+  if !=(and(n, 1), 0)
+  begin
+    result = *(result, 2)
+  end
+  
+  return result
+end
+
+private int RunIteration()
+begin
+    int total 0
+    # n must be <= 20, because otherwise the factorials will overflow
+    int n 0
+    while <=(n, 20)
+    begin
+        int k 0
+        int rowSum 0
+        while <=(k, n)
+        begin
+            int simple SimpleBinomial(n, k)
+            int efficient EfficientBinomial(n, k)
+            int recursive RecursiveBinomial(n, k)
+            
+            # A VERY smart compiler would notice that one is redundant...
+            UnitTest.AssertInt(simple, efficient)
+            UnitTest.AssertInt(simple, recursive)
+            UnitTest.AssertInt(recursive, efficient)
+            
+            rowSum = +(rowSum, recursive)
+            k = +(k, 1)
+        end
+        
+        # Rows always sum to 2^n
+        UnitTest.AssertInt(rowSum, TwoTo(n))
+        
+        n = +(n, 1)
+        total = +(total, rowSum)
+    end
+    return total
+end
+
+public int Main()
+begin
+    int i 100
+    while >(i, 0)
+    begin
+        UnitTest.AssertInt(RunIteration(), -(TwoTo(21), 1))
+        i = -(i, 1)
+    end
+    return 100
+end

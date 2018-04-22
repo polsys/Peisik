@@ -37,9 +37,30 @@
         internal bool IsParameter;
 
         /// <summary>
-        /// TODO: Will be replaced with an abstraction for storage location.
+        /// A platform-dependent value for storage location.
         /// </summary>
-        internal int LocalIndex;
+        /// <remarks>
+        /// Initially set to -1 to signal unassigned location.
+        /// </remarks>
+        internal int StorageLocation = -1;
+
+        /// <summary>
+        /// If false, this variable may be spilled to stack.
+        /// </summary>
+        internal bool OnStack;
+
+        /// <summary>
+        /// The start position of the live interval.
+        /// </summary>
+        /// <remarks>
+        /// Initially set to -1 to distinguish from computed intervals.
+        /// </remarks>
+        internal int IntervalStart = -1;
+
+        /// <summary>
+        /// The end position of the live interval.
+        /// </summary>
+        internal int IntervalEnd = -1;
 
         public override string ToString()
         {

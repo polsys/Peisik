@@ -35,7 +35,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         /// <summary>
         /// Emits bytecode for the function and stores it in the result program.
         /// </summary>
-        public void CompileFunction(Function function)
+        public void CompileFunction(Function function, Optimization optimizationLevel)
         {
             // You might notice that CompiledFunction wasn't really designed for this...
             var compiled = new CompiledFunction(null, function.FullName, "", false, true)
@@ -56,17 +56,40 @@ namespace Polsys.Peisik.Compiler.Optimizing
             FoldSingleUseLocals(function);
 
             // Create the locals table
-            // Parameters are always included, whereas unused locals are ignored
-            // TODO: This will be changed once register allocation exists
-            foreach (var local in function.Locals)
+            if (optimizationLevel.HasFlag(Optimization.RegisterAllocation))
             {
-                if (!local.IsParameter && local.UseCount == 0 && local.AssignmentCount == 0)
-                    continue;
-                local.LocalIndex = compiled.Locals.Count;
-                compiled.AddLocal(local.Name, local.Type);
+                // Run the register allocator
+                var stackSize = RegisterAllocator<PeisikRegisterBackend>.Allocate(function);
 
-                if (local.IsParameter)
-                    compiled.ParameterTypes.Add(local.Type);
+                // Create enough local slots
+                compiled.ReserveLocals((short)stackSize);
+
+                // Assign correct types for each local slot
+                foreach (var local in function.Locals)
+                {
+                    if (local.StorageLocation >= 0)
+                    {
+                        compiled.UpdateLocal((short)local.StorageLocation, local.Name, local.Type);
+                    }
+
+                    if (local.IsParameter)
+                        compiled.ParameterTypes.Add(local.Type);
+                }
+            }
+            else
+            {
+                // No local slot allocation: create an entry for each local variable
+                // Parameters are always included, whereas unused locals are ignored
+                foreach (var local in function.Locals)
+                {
+                    if (!local.IsParameter && local.UseCount == 0 && local.AssignmentCount == 0)
+                        continue;
+                    local.StorageLocation = compiled.Locals.Count;
+                    compiled.AddLocal(local.Name, local.Type);
+
+                    if (local.IsParameter)
+                        compiled.ParameterTypes.Add(local.Type);
+                }
             }
 
             // Then compile the code
@@ -245,13 +268,13 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             if (target != null)
             {
-                compiled.Bytecode.Add(new BytecodeOp(Opcode.PopLocal, (short)target.LocalIndex));
+                compiled.Bytecode.Add(new BytecodeOp(Opcode.PopLocal, (short)target.StorageLocation));
             }
         }
 
         private void EmitPush(LocalVariable local, CompiledFunction compiled)
         {
-            var localIndex = (short)local.LocalIndex;
+            var localIndex = (short)local.StorageLocation;
             compiled.Bytecode.Add(new BytecodeOp(Opcode.PushLocal, localIndex));
         }
 

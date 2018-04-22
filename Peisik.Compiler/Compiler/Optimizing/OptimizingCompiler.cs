@@ -103,7 +103,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 var codeGen = new CodeGeneratorPeisik();
                 foreach ((var function, _) in _functions.Values)
                 {
-                    codeGen.CompileFunction(function);
+                    codeGen.CompileFunction(function, _optimizationLevel);
                 }
 
                 return (codeGen.GetProgram(), _diagnostics);

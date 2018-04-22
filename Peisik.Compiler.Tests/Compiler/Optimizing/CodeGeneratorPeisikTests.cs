@@ -17,7 +17,7 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             function.Compile();
             var codeGen = new CodeGeneratorPeisik();
 
-            codeGen.CompileFunction(function);
+            codeGen.CompileFunction(function, Optimization.None);
             return codeGen.GetProgram();
         }
 
@@ -499,15 +499,98 @@ public int Main()
 begin
   return Function(1, true, 1.0)
 end";
-            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.None);
+            var program = CompileOptimizedWithoutDiagnostics(source, optimizationLevel);
 
             Assert.That(program, Is.Not.Null);
             var function = program.Functions[1 - program.MainFunctionIndex];
-            Assert.That(function.Locals[0].name, Does.StartWith("a"));
+
+            // Register allocation may combine stack slots for a and result
+            Assert.That(function.Locals[0].name, Does.StartWith("a").Or.StartWith("result"));
             Assert.That(function.Locals[1].name, Does.StartWith("b"));
             Assert.That(function.Locals[2].name, Does.StartWith("c"));
 
             Assert.That(function.ParameterTypes, Has.Exactly(3).Items);
+        }
+
+        [Test]
+        public void RegisterAllocation_LocalSlotsCombined()
+        {
+            var source = @"
+public void Main()
+begin
+  # Two uses for each so that FoldSingleUseLocals does not fire
+  int i 2
+  i = +(i,1)
+  print(i)
+  int j 3
+  j = +(j, 1)
+  print(j)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.RegisterAllocation);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Void main() [1 locals]
+PushConst   $literal_2
+PopLocal    j$2
+PushLocal   j$2
+PushConst   $literal_1
+CallI2      Plus
+PopLocal    j$2
+PushLocal   j$2
+CallI1      Print
+PushConst   $literal_3
+PopLocal    j$2
+PushLocal   j$2
+PushConst   $literal_1
+CallI2      Plus
+PopLocal    j$2
+PushLocal   j$2
+CallI1      Print
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
+        }
+
+        [Test]
+        public void RegisterAllocation_LocalSlotForEachType()
+        {
+            var source = @"
+public void Main()
+begin
+  # Two uses for each so that FoldSingleUseLocals does not fire
+  bool b true
+  print(b)
+  print(b)
+  int i 1
+  print(i)
+  print(i)
+  real r 2.0
+  print(r)
+  print(r)
+end";
+            var program = CompileOptimizedWithoutDiagnostics(source, Optimization.RegisterAllocation);
+
+            Assert.That(program, Is.Not.Null);
+            var disasm = @"Void main() [3 locals]
+PushConst   $literal_true
+PopLocal    b$1
+PushLocal   b$1
+CallI1      Print
+PushLocal   b$1
+CallI1      Print
+PushConst   $literal_1
+PopLocal    i$2
+PushLocal   i$2
+CallI1      Print
+PushLocal   i$2
+CallI1      Print
+PushConst   $literal_2r
+PopLocal    r$3
+PushLocal   r$3
+CallI1      Print
+PushLocal   r$3
+CallI1      Print
+Return";
+            VerifyDisassembly(program.Functions[program.MainFunctionIndex], program, disasm);
         }
 
         [Test]

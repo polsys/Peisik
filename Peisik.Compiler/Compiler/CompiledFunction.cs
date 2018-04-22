@@ -55,5 +55,19 @@ namespace Polsys.Peisik.Compiler
 
             return index;
         }
+
+        public void ReserveLocals(short count)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                Locals.Add(("!reserved", PrimitiveType.NoType));
+            }
+        }
+
+        public void UpdateLocal(short index, string fullName, PrimitiveType type)
+        {
+            _localMap.Add(fullName, index);
+            Locals[index] = (fullName, type);
+        }
     }
 }

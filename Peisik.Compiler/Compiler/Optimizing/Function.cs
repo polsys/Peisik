@@ -21,7 +21,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         internal List<LocalVariable> Locals = new List<LocalVariable>();
 
-        internal LocalVariable ResultValue { get; private set; }
+        public LocalVariable ResultValue { get; internal set; }
 
         public OptimizingCompiler Compiler => _compiler;
         private OptimizingCompiler _compiler;

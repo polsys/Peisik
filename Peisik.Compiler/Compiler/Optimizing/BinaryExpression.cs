@@ -59,20 +59,70 @@ namespace Polsys.Peisik.Compiler.Optimizing
             var leftConst = (ConstantExpression)Left;
             var rightConst = (ConstantExpression)Right;
 
-            if (InternalFunctionId == InternalFunction.Plus)
+            // For many functions, the parameters may be either all integers, in which case the result
+            // is an integer, or all floats / mixed, in which case the result is a floating-point value.
+            // Some accept all bools, and some just want everything to be the same type.
+            if (leftConst.Type == PrimitiveType.Int && rightConst.Type == PrimitiveType.Int)
             {
-                // The parameters may be either all integers, in which case the result is an integer,
-                // or all floats / mixed, in which case the result is a floating-point value.
-                if (leftConst.Type == PrimitiveType.Int && rightConst.Type == PrimitiveType.Int)
+                var leftLong = (long)leftConst.Value;
+                var rightLong = (long)rightConst.Value;
+
+                switch (InternalFunctionId)
                 {
-                    return new ConstantExpression((long)leftConst.Value + (long)rightConst.Value, compiler, Store);
-                }
-                else
-                {
-                    return new ConstantExpression(Convert.ToDouble(leftConst.Value) + Convert.ToDouble(rightConst.Value), compiler, Store);
+                    case InternalFunction.Plus:
+                        return new ConstantExpression(leftLong + rightLong, compiler, Store);
+                    case InternalFunction.Minus:
+                        return new ConstantExpression(leftLong - rightLong, compiler, Store);
+                    case InternalFunction.Multiply:
+                        return new ConstantExpression(leftLong * rightLong, compiler, Store);
+                    case InternalFunction.Divide:
+                        if (rightLong == 0)
+                            break;
+                        return new ConstantExpression((double)leftLong
+                            / rightLong, compiler, Store);
+                    case InternalFunction.FloorDivide:
+                        if (rightLong == 0)
+                            break;
+                        return new ConstantExpression(leftLong / rightLong, compiler, Store);
+                    case InternalFunction.Mod:
+                        if (rightLong == 0)
+                            break;
+
+                        // The result is always non-negative
+                        var value = leftLong % rightLong;
+                        if (value < 0)
+                            value += Math.Abs(rightLong);
+
+                        return new ConstantExpression(value, compiler, Store);
                 }
             }
-            else if (InternalFunctionId == InternalFunction.Equal)
+            else if ((leftConst.Type == PrimitiveType.Int && rightConst.Type == PrimitiveType.Real)
+                || (leftConst.Type == PrimitiveType.Real && rightConst.Type == PrimitiveType.Int)
+                || (leftConst.Type == PrimitiveType.Real && rightConst.Type == PrimitiveType.Real))
+            {
+                var leftDouble = Convert.ToDouble(leftConst.Value);
+                var rightDouble = Convert.ToDouble(rightConst.Value);
+
+                switch (InternalFunctionId)
+                {
+                    case InternalFunction.Plus:
+                        return new ConstantExpression(leftDouble + rightDouble, compiler, Store);
+                    case InternalFunction.Minus:
+                        return new ConstantExpression(leftDouble - rightDouble, compiler, Store);
+                    case InternalFunction.Multiply:
+                        return new ConstantExpression(leftDouble * rightDouble, compiler, Store);
+                    case InternalFunction.Divide:
+                        if (rightDouble == 0.0)
+                            break;
+                        return new ConstantExpression(leftDouble / rightDouble, compiler, Store);
+                    case InternalFunction.FloorDivide:
+                        if (rightDouble == 0.0)
+                            break;
+                        return new ConstantExpression((long)(leftDouble / rightDouble), compiler, Store);
+                }
+            }
+            
+            if (InternalFunctionId == InternalFunction.Equal)
             {
                 // Overloaded object.Equals should do the comparison correctly
                 return new ConstantExpression(leftConst.Value.Equals(rightConst.Value), compiler, Store);

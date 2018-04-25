@@ -7,12 +7,34 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
 {
     class BinaryExpressionTests
     {
+        [TestCase("and", true, true, true)]
+        [TestCase("and", true, false, false)]
+        [TestCase("or", false, false, false)]
+        [TestCase("or", true, false, true)]
+        [TestCase("xor", true, true, false)]
+        [TestCase("xor", true, false, true)]
+        public void ConstantFolding_TwoBools(string function, bool left, bool right, bool expected)
+        {
+            var expr = new BinaryExpression(InternalFunctions.Functions[function],
+                new ConstantExpression(left, null), new ConstantExpression(right, null));
+            var local = new LocalVariable(PrimitiveType.Bool, "");
+            expr.Store = local;
+            var folded = expr.Fold(null);
+
+            Assert.That(folded, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)folded).Value, Is.EqualTo(expected));
+            Assert.That(folded.Store, Is.SameAs(local));
+        }
+
         [TestCase("+", 2L, 3L, 5L)]
         [TestCase("-", 2L, 3L, -1L)]
         [TestCase("*", 2L, 3L, 6L)]
         [TestCase("%", 7L, 3L, 1L)]
         [TestCase("%", 7L, -3L, 1L)]
         [TestCase("%", -7L, 3L, 2L)]
+        [TestCase("and", 0b1100L, 0b1010L, 0b1000L)]
+        [TestCase("or", 0b1100L, 0b1010L, 0b1110L)]
+        [TestCase("xor", 0b1100L, 0b1010L, 0b0110L)]
         public void ConstantFolding_TwoInts(string function, long left, long right, long expected)
         {
             var expr = new BinaryExpression(InternalFunctions.Functions[function],

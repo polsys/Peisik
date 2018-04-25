@@ -94,6 +94,12 @@ namespace Polsys.Peisik.Compiler.Optimizing
                             value += Math.Abs(rightLong);
 
                         return new ConstantExpression(value, compiler, Store);
+                    case InternalFunction.And:
+                        return new ConstantExpression(leftLong & rightLong, compiler, Store);
+                    case InternalFunction.Or:
+                        return new ConstantExpression(leftLong | rightLong, compiler, Store);
+                    case InternalFunction.Xor:
+                        return new ConstantExpression(leftLong ^ rightLong, compiler, Store);
                 }
             }
             else if ((leftConst.Type == PrimitiveType.Int && rightConst.Type == PrimitiveType.Real)
@@ -119,6 +125,21 @@ namespace Polsys.Peisik.Compiler.Optimizing
                         if (rightDouble == 0.0)
                             break;
                         return new ConstantExpression((long)(leftDouble / rightDouble), compiler, Store);
+                }
+            }
+            else if (leftConst.Type == PrimitiveType.Bool && rightConst.Type == PrimitiveType.Bool)
+            {
+                var leftBool = (bool)leftConst.Value;
+                var rightBool = (bool)rightConst.Value;
+
+                switch (InternalFunctionId)
+                {
+                    case InternalFunction.And:
+                        return new ConstantExpression(leftBool & rightBool, compiler, Store);
+                    case InternalFunction.Or:
+                        return new ConstantExpression(leftBool | rightBool, compiler, Store);
+                    case InternalFunction.Xor:
+                        return new ConstantExpression(leftBool ^ rightBool, compiler, Store);
                 }
             }
             

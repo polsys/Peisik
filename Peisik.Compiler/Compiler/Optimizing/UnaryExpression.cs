@@ -7,12 +7,13 @@
     {
         public Expression Expression { get; private set; }
 
-        public InternalFunction InternalFunctionId { get; private set; }
+        public InternalFunction InternalFunctionId => _internalFunction.Index;
+        private InternalFunctionDefinition _internalFunction;
 
         public UnaryExpression(InternalFunctionDefinition func, Expression parameter)
         {
             Expression = parameter;
-            InternalFunctionId = func.Index;
+            _internalFunction = func;
 
             switch (func.ReturnType)
             {
@@ -38,7 +39,36 @@
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
-            return this;
+            var folded = Expression.Fold(compiler);
+            
+            if (folded is ConstantExpression constant)
+            {
+                if (InternalFunctionId == InternalFunction.Minus)
+                {
+                    if (constant.Value is long longValue)
+                    {
+                        return new ConstantExpression(-longValue, compiler, Store);
+                    }
+                    else if (constant.Value is double doubleValue)
+                    {
+                        return new ConstantExpression(-doubleValue, compiler, Store);
+                    }
+                }
+                else if (InternalFunctionId == InternalFunction.Not)
+                {
+                    if (constant.Value is bool boolValue)
+                    {
+                        return new ConstantExpression(!boolValue, compiler, Store);
+                    }
+                    else if (constant.Value is long longValue)
+                    {
+                        return new ConstantExpression(~longValue, compiler, Store);
+                    }
+                }
+            }
+
+            // Could not fold, but the inner expression might be simplified now
+            return new UnaryExpression(_internalFunction, folded);
         }
     }
 }

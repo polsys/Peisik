@@ -46,6 +46,7 @@
     <Compile Include="Compiler\CompilerTests.ControlFlow.cs" />
     <Compile Include="Compiler\CompilerTests.Analysis.cs" />
     <Compile Include="Compiler\CompilerTests.SimpleModules.cs" />
+    <Compile Include="Compiler\Optimizing\UnaryExpressionTests.cs" />
     <Compile Include="Compiler\Optimizing\RegisterAllocatorTests.cs" />
     <Compile Include="Compiler\Optimizing\CodeGeneratorPeisikTests.cs" />
     <Compile Include="Compiler\Optimizing\BinaryExpressionTests.cs" />

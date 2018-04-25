@@ -10,13 +10,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
         public Expression Left { get; private set; }
         public Expression Right { get; private set; }
 
-        public InternalFunction InternalFunctionId { get; private set; }
+        public InternalFunction InternalFunctionId => _internalFunction.Index;
+        private InternalFunctionDefinition _internalFunction;
 
         public BinaryExpression(InternalFunctionDefinition func, Expression left, Expression right)
         {
             Left = left;
             Right = right;
-            InternalFunctionId = func.Index;
+            _internalFunction = func;
 
             // There are several options for the resulting type
             switch (func.ReturnType)
@@ -47,18 +48,17 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
         public override Expression Fold(OptimizingCompiler compiler)
         {
-            if (Left is ConstantExpression && Right is ConstantExpression)
+            if (Left.Fold(compiler) is ConstantExpression left
+                && Right.Fold(compiler) is ConstantExpression right)
             {
-                return FoldTwoConstants(compiler);
+                return FoldTwoConstants(left, right, compiler);
             }
             return this;
         }
 
-        private Expression FoldTwoConstants(OptimizingCompiler compiler)
+        private Expression FoldTwoConstants(ConstantExpression leftConst,
+            ConstantExpression rightConst, OptimizingCompiler compiler)
         {
-            var leftConst = (ConstantExpression)Left;
-            var rightConst = (ConstantExpression)Right;
-
             // For many functions, the parameters may be either all integers, in which case the result
             // is an integer, or all floats / mixed, in which case the result is a floating-point value.
             // Some accept all bools, and some just want everything to be the same type.
@@ -150,7 +150,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
             // TODO: Implement more
 
-            return this;
+            return new BinaryExpression(_internalFunction, leftConst, rightConst);
         }
     }
 }

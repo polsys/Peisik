@@ -128,7 +128,7 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             var folded = expr.Fold(null);
 
             // Folding not performed
-            Assert.That(folded, Is.SameAs(expr));
+            Assert.That(folded, Is.InstanceOf<BinaryExpression>());
         }
 
         [Test]
@@ -171,6 +171,35 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             Assert.That(folded, Is.InstanceOf<ConstantExpression>());
             Assert.That(((ConstantExpression)folded).Value, Is.EqualTo(true));
             Assert.That(folded.Store, Is.SameAs(local));
+        }
+
+        [Test]
+        public void ConstantFolding_FoldsParamToNonFoldable()
+        {
+            var left = new BinaryExpression(InternalFunctions.Functions["+"],
+                new ConstantExpression(1L, null), new ConstantExpression(2L, null));
+            var right = new BinaryExpression(InternalFunctions.Functions["+"],
+                new ConstantExpression(3L, null), new ConstantExpression(4L, null));
+            var expr = new BinaryExpression(InternalFunctions.Functions["math.pow"], left, right);
+            var folded = expr.Fold(null);
+
+            Assert.That(folded, Is.InstanceOf<BinaryExpression>());
+            Assert.That(((BinaryExpression)folded).Left, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((BinaryExpression)folded).Right, Is.InstanceOf<ConstantExpression>());
+        }
+
+        [Test]
+        public void ConstantFolding_Recurses()
+        {
+            var left = new BinaryExpression(InternalFunctions.Functions["+"],
+                new ConstantExpression(1L, null), new ConstantExpression(2L, null));
+            var right = new BinaryExpression(InternalFunctions.Functions["+"],
+                new ConstantExpression(3L, null), new ConstantExpression(4L, null));
+            var expr = new BinaryExpression(InternalFunctions.Functions["+"], left, right);
+            var folded = expr.Fold(null);
+
+            Assert.That(folded, Is.InstanceOf<ConstantExpression>());
+            Assert.That(((ConstantExpression)folded).Value, Is.EqualTo(10));
         }
     }
 }

@@ -19,6 +19,7 @@ While the initial version only emits Peisik bytecode, the design should be exten
 ## Optimizations (implemented so far)
 - Constant folding
   - Internal functions with constant parameters
+  - The `Math` namespace is excluded
   - Simplification of if statements with constant condition
 - Variable slot allocation
   - Implemented as a linear scan register allocator
@@ -37,3 +38,6 @@ While the initial version only emits Peisik bytecode, the design should be exten
   - Instead of repeating expensive calculations, store the result into a local
   - Needs cost heuristics
   - Would be easier with a full SSA form
+- Range estimation (maybe)
+  - For example `sin(x) > 2` would be always false
+  - Probably not at all useful, but could be interesting to implement

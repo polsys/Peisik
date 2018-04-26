@@ -131,45 +131,36 @@ namespace Polsys.Peisik.Tests.Compiler.Optimizing
             Assert.That(folded, Is.InstanceOf<BinaryExpression>());
         }
 
-        [Test]
-        public void ConstantFolding_Equal_Bool_True()
+        [TestCase("==", true, false, false)]
+        [TestCase("!=", true, false, true)]
+        [TestCase("==", 1L, 2L, false)]
+        [TestCase("!=", 1L, 2L, true)]
+        [TestCase("<", 1L, 2L, true)]
+        [TestCase("<=", 1L, 2L, true)]
+        [TestCase(">", 1L, 2L, false)]
+        [TestCase(">=", 1L, 2L, false)]
+        [TestCase("==", 1.0, 2.0, false)]
+        [TestCase("!=", 1.0, 2.0, true)]
+        [TestCase("<", 1.0, 2.0, true)]
+        [TestCase("<=", 1.0, 2.0, true)]
+        [TestCase(">", 1.0, 2.0, false)]
+        [TestCase(">=", 1.0, 2.0, false)]
+        [TestCase("==", 1L, 2.0, false)]
+        [TestCase("!=", 1L, 2.0, true)]
+        [TestCase("<", 1L, 2.0, true)]
+        [TestCase("<=", 1L, 2.0, true)]
+        [TestCase(">", 1L, 2.0, false)]
+        [TestCase(">=", 1L, 2.0, false)]
+        public void ConstantFolding_Comparisons(string function, object left, object right, bool expected)
         {
-            var expr = new BinaryExpression(InternalFunctions.Functions["=="],
-                new ConstantExpression(false, null), new ConstantExpression(false, null));
+            var expr = new BinaryExpression(InternalFunctions.Functions[function],
+                new ConstantExpression(left, null), new ConstantExpression(right, null));
             var local = new LocalVariable(PrimitiveType.Bool, "");
             expr.Store = local;
             var folded = expr.Fold(null);
 
             Assert.That(folded, Is.InstanceOf<ConstantExpression>());
-            Assert.That(((ConstantExpression)folded).Value, Is.EqualTo(true));
-            Assert.That(folded.Store, Is.SameAs(local));
-        }
-
-        [Test]
-        public void ConstantFolding_Equal_Int_False()
-        {
-            var expr = new BinaryExpression(InternalFunctions.Functions["=="],
-                new ConstantExpression(2L, null), new ConstantExpression(3L, null));
-            var local = new LocalVariable(PrimitiveType.Bool, "");
-            expr.Store = local;
-            var folded = expr.Fold(null);
-
-            Assert.That(folded, Is.InstanceOf<ConstantExpression>());
-            Assert.That(((ConstantExpression)folded).Value, Is.EqualTo(false));
-            Assert.That(folded.Store, Is.SameAs(local));
-        }
-
-        [Test]
-        public void ConstantFolding_Equal_Real_True()
-        {
-            var expr = new BinaryExpression(InternalFunctions.Functions["=="],
-                new ConstantExpression(2.0, null), new ConstantExpression(2.0, null));
-            var local = new LocalVariable(PrimitiveType.Bool, "");
-            expr.Store = local;
-            var folded = expr.Fold(null);
-
-            Assert.That(folded, Is.InstanceOf<ConstantExpression>());
-            Assert.That(((ConstantExpression)folded).Value, Is.EqualTo(true));
+            Assert.That(((ConstantExpression)folded).Value, Is.EqualTo(expected));
             Assert.That(folded.Store, Is.SameAs(local));
         }
 

@@ -100,6 +100,18 @@ namespace Polsys.Peisik.Compiler.Optimizing
                         return new ConstantExpression(leftLong | rightLong, compiler, Store);
                     case InternalFunction.Xor:
                         return new ConstantExpression(leftLong ^ rightLong, compiler, Store);
+                    case InternalFunction.Equal:
+                        return new ConstantExpression(leftLong == rightLong, compiler, Store);
+                    case InternalFunction.NotEqual:
+                        return new ConstantExpression(leftLong != rightLong, compiler, Store);
+                    case InternalFunction.Less:
+                        return new ConstantExpression(leftLong < rightLong, compiler, Store);
+                    case InternalFunction.LessEqual:
+                        return new ConstantExpression(leftLong <= rightLong, compiler, Store);
+                    case InternalFunction.Greater:
+                        return new ConstantExpression(leftLong > rightLong, compiler, Store);
+                    case InternalFunction.GreaterEqual:
+                        return new ConstantExpression(leftLong >= rightLong, compiler, Store);
                 }
             }
             else if ((leftConst.Type == PrimitiveType.Int && rightConst.Type == PrimitiveType.Real)
@@ -125,6 +137,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
                         if (rightDouble == 0.0)
                             break;
                         return new ConstantExpression((long)(leftDouble / rightDouble), compiler, Store);
+                    // These comparisons are of course imprecise when the types are mixed,
+                    // but the interpreter does it anyway.
+                    case InternalFunction.Equal:
+                        return new ConstantExpression(leftDouble == rightDouble, compiler, Store);
+                    case InternalFunction.NotEqual:
+                        return new ConstantExpression(leftDouble != rightDouble, compiler, Store);
+                    case InternalFunction.Less:
+                        return new ConstantExpression(leftDouble < rightDouble, compiler, Store);
+                    case InternalFunction.LessEqual:
+                        return new ConstantExpression(leftDouble <= rightDouble, compiler, Store);
+                    case InternalFunction.Greater:
+                        return new ConstantExpression(leftDouble > rightDouble, compiler, Store);
+                    case InternalFunction.GreaterEqual:
+                        return new ConstantExpression(leftDouble >= rightDouble, compiler, Store);
                 }
             }
             else if (leftConst.Type == PrimitiveType.Bool && rightConst.Type == PrimitiveType.Bool)
@@ -140,16 +166,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
                         return new ConstantExpression(leftBool | rightBool, compiler, Store);
                     case InternalFunction.Xor:
                         return new ConstantExpression(leftBool ^ rightBool, compiler, Store);
+                    case InternalFunction.Equal:
+                        return new ConstantExpression(leftBool == rightBool, compiler, Store);
+                    case InternalFunction.NotEqual:
+                        return new ConstantExpression(leftBool != rightBool, compiler, Store);
                 }
             }
             
-            if (InternalFunctionId == InternalFunction.Equal)
-            {
-                // Overloaded object.Equals should do the comparison correctly
-                return new ConstantExpression(leftConst.Value.Equals(rightConst.Value), compiler, Store);
-            }
-            // TODO: Implement more
-
+            // Did not fold the expression, but the parameters might be folded
             return new BinaryExpression(_internalFunction, leftConst, rightConst);
         }
     }

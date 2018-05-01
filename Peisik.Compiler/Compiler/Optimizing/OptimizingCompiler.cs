@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using Polsys.Peisik.Parser;
 
 namespace Polsys.Peisik.Compiler.Optimizing
@@ -51,53 +52,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             try
             {
-                // First go through all modules and add constants and functions
-                // After this pass all type information is known and functions may be referenced
-                foreach (var module in _modules)
-                {
-                    foreach (var constant in module.Constants)
-                    {
-                        AddConstant(constant.Name, module.ModuleName, constant.Visibility, constant.Value);
-                    }
-                    
-                    foreach (var function in module.Functions)
-                    {
-                        var f = Function.InitializeFromSyntax(function, this, module.ModuleName);
-                        var onlyVisibleTo = "";
-                        if (function.Visibility == Visibility.Private)
-                        {
-                            onlyVisibleTo = module.ModuleName.ToLowerInvariant() + ".";
-                        }
-
-                        _functions.Add(f.FullName, (f, onlyVisibleTo));
-                    }
-                }
-
-                // Compile each function
-                // Actual syntactic analysis is performed in this pass
-                // Also do some preliminary analysis and simple optimizations (if desired)
-                foreach ((var function, _) in _functions.Values)
-                {
-                    function.Compile();
-                    function.AnalyzeAndOptimizePreInlining(_optimizationLevel);
-                }
-
-                // Ensure that there is a Main() function and it has no parameters
-                if (_functions.TryGetValue("main", out var mainFunction))
-                {
-                    if (mainFunction.function.ParameterTypes.Count > 0)
-                    {
-                        LogError(DiagnosticCode.MainMayNotHaveParameters, default);
-                    }
-                }
-                else
-                {
-                    LogError(DiagnosticCode.NoMainFunction, default);
-                }
-
-                // Run desired optimizations
-                // - inlining
-                // - optimizations that are run after inlining
+                CompileShared();
 
                 // Generate code
                 var codeGen = new CodeGeneratorPeisik();
@@ -114,6 +69,94 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 // Compilation failed, return failure
                 return (null, _diagnostics);
             }
+        }
+
+        /// <summary>
+        /// Compiles an x64 executable file and optionally outputs disassembled code.
+        /// </summary>
+        /// <param name="exeWriter">The stream writer for the executable file. Assumed to be empty.</param>
+        /// <param name="debugWriter">If non-null, disassembly will be written using this writer.</param>
+        /// <returns>
+        /// List of compilation diagnostics.
+        /// If there were compilation errors, the streams are not written to.
+        /// </returns>
+        public List<CompilationDiagnostic> CompileX64(BinaryWriter exeWriter, StreamWriter debugWriter)
+        {
+            try
+            {
+                // The X64 backend would prefer to see constants folded
+                // and will do register allocation regardless of user choice.
+                _optimizationLevel |= (Optimization.ConstantFolding | Optimization.RegisterAllocation);
+
+                CompileShared();
+
+                // Generate code
+                var codeGen = new CodeGeneratorX64(exeWriter, debugWriter);
+                foreach ((var function, _) in _functions.Values)
+                {
+                    codeGen.CompileFunction(function, _optimizationLevel);
+                }
+                codeGen.FinalizeOutput();
+
+                return _diagnostics;
+
+            }
+            catch (CompilerException)
+            {
+                // Compilation failed, return failure
+                return _diagnostics;
+            }
+        }
+
+        private void CompileShared()
+        {
+            // First go through all modules and add constants and functions
+            // After this pass all type information is known and functions may be referenced
+            foreach (var module in _modules)
+            {
+                foreach (var constant in module.Constants)
+                {
+                    AddConstant(constant.Name, module.ModuleName, constant.Visibility, constant.Value);
+                }
+
+                foreach (var function in module.Functions)
+                {
+                    var f = Function.InitializeFromSyntax(function, this, module.ModuleName);
+                    var onlyVisibleTo = "";
+                    if (function.Visibility == Visibility.Private)
+                    {
+                        onlyVisibleTo = module.ModuleName.ToLowerInvariant() + ".";
+                    }
+
+                    _functions.Add(f.FullName, (f, onlyVisibleTo));
+                }
+            }
+
+            // Compile each function
+            // Actual syntactic analysis is performed in this pass
+            // Also do some preliminary analysis and simple optimizations (if desired)
+            foreach ((var function, _) in _functions.Values)
+            {
+                function.Compile();
+                function.AnalyzeAndOptimizePreInlining(_optimizationLevel);
+            }
+
+            // Ensure that there is a Main() function and it has no parameters
+            if (_functions.TryGetValue("main", out var mainFunction))
+            {
+                if (mainFunction.function.ParameterTypes.Count > 0)
+                {
+                    LogError(DiagnosticCode.MainMayNotHaveParameters, default);
+                }
+            }
+            else
+            {
+                LogError(DiagnosticCode.NoMainFunction, default);
+            }
+
+            // Run desired optimizations
+            // - inlining
+            // - optimizations that are run after inlining
         }
 
         internal void AddConstant(string name, string moduleName, Visibility visibility, object value)

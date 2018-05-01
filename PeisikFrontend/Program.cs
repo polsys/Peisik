@@ -19,6 +19,7 @@ namespace Polsys.PeisikFrontend
             var optimize = false;
             var timing = false;
             var showHelp = args.Length == 0;
+            var x64 = false;
             var modules = new List<string>();
             foreach (var arg in args)
             {
@@ -43,6 +44,10 @@ namespace Polsys.PeisikFrontend
                 {
                     timing = true;
                 }
+                else if (argInLower == "--x64")
+                {
+                    x64 = true;
+                }
                 else
                 {
                     modules.Add(arg);
@@ -60,7 +65,14 @@ namespace Polsys.PeisikFrontend
                 Console.WriteLine(" --optimize Optimize code. (No effect when used with --legacy.)");
                 Console.WriteLine("  -o");
                 Console.WriteLine(" --timing   Print compilation times.");
+                Console.WriteLine(" --x64      Output a native EXE file.");
                 return;
+            }
+
+            if (legacyCompiler && x64)
+            {
+                Console.WriteLine("Ignoring --legacy parameter because it is not compatible with --x64.");
+                legacyCompiler = false;
             }
 
             // Compile each module
@@ -70,21 +82,49 @@ namespace Polsys.PeisikFrontend
             {
                 var moduleNameWithExt = moduleName;
                 if (string.IsNullOrEmpty(Path.GetExtension(moduleName)))
-                    moduleNameWithExt = moduleName + ".peisik";
+                     moduleNameWithExt = moduleName + ".peisik";
+
+                // The [optimized] tag not only makes the mode clear,
+                // but shows up in diffs between non-optimized and optimized disassembly.
+                Console.WriteLine("-- Compiling module " + moduleNameWithExt + (optimize ? " [optimized]" : ""));
 
                 var moduleTime = Stopwatch.StartNew();
-                var module = CompileModule(moduleNameWithExt, legacyCompiler, optimize);
-                moduleTime.Stop();
+
+                try
+                {
+                    var parsedModules = ParseModuleAndDependencies(moduleNameWithExt);
+                    if (parsedModules == null)
+                        continue;
+
+                    if (!x64)
+                    {
+                        var compiledProgram = CompilePeisik(moduleNameWithExt, parsedModules, legacyCompiler, optimize);
+                        moduleTime.Stop();
+
+                        if (compiledProgram != null)
+                        {
+                            success++;
+                            if (disassembly)
+                                DisassembleModule(compiledProgram);
+                        }
+                    }
+                    else if (x64)
+                    {
+                        if (CompileX64(moduleNameWithExt, parsedModules, legacyCompiler, optimize))
+                        {
+                            success++;
+                        }
+                        moduleTime.Stop();
+                    }
+                }
+                catch (IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+                
                 if (timing)
                 {
                     Console.WriteLine($"-- Time for this module: {moduleTime.Elapsed.TotalSeconds} s");
-                }
-
-                if (module != null)
-                {
-                    success++;
-                    if (disassembly)
-                        DisassembleModule(module);
                 }
             }
             totalTime.Stop();
@@ -96,66 +136,58 @@ namespace Polsys.PeisikFrontend
             }
         }
 
-        private static CompiledProgram CompileModule(string filename, bool legacyCompiler, bool optimize)
+        private static List<ModuleSyntax> ParseModuleAndDependencies(string filename)
         {
-            // The [optimized] tag not only makes the mode clear,
-            // but shows up in diffs between non-optimized and optimized disassembly.
-            Console.WriteLine("-- Compiling module " + filename + (optimize ? " [optimized]" : ""));
-
-            try
+            using (var source = new StreamReader(filename))
             {
-                using (var source = new StreamReader(filename))
+                // Parse the main module
+                (var mainModule, var parserDiags) = ModuleParser.Parse(source, filename, "");
+                PrintDiagnostics(parserDiags);
+                if (mainModule == null)
+                    return null;
+
+                // Parse all its dependencies
+                var modules = new Dictionary<string, ModuleSyntax>();
+                var moduleDependencies = new List<string>();
+                moduleDependencies.AddRange(mainModule.ModuleDependencies);
+
+                for (int i = 0; i < moduleDependencies.Count; i++)
                 {
-                    // Parse the main module
-                    (var mainModule, var parserDiags) = ModuleParser.Parse(source, filename, "");
-                    PrintDiagnostics(parserDiags);
-                    if (mainModule == null)
-                        return null;
+                    if (modules.ContainsKey(moduleDependencies[i]))
+                        continue;
 
-                    // Parse all its dependencies
-                    var modules = new Dictionary<string, ModuleSyntax>();
-                    var moduleDependencies = new List<string>();
-                    moduleDependencies.AddRange(mainModule.ModuleDependencies);
-
-                    for (int i = 0; i < moduleDependencies.Count; i++)
+                    var modFileName = moduleDependencies[i] + ".peisik";
+                    using (var modFile = new StreamReader(modFileName))
                     {
-                        if (modules.ContainsKey(moduleDependencies[i]))
-                            continue;
+                        (var mod, var diags) = ModuleParser.Parse(modFile, modFileName, moduleDependencies[i]);
+                        PrintDiagnostics(diags);
+                        if (mod == null)
+                            return null;
 
-                        var modFileName = moduleDependencies[i] + ".peisik";
-                        using (var modFile = new StreamReader(modFileName))
-                        {
-                            (var mod, var diags) = ModuleParser.Parse(modFile, modFileName, moduleDependencies[i]);
-                            PrintDiagnostics(diags);
-                            if (mod == null)
-                                return null;
-
-                            modules.Add(moduleDependencies[i], mod);
-                            moduleDependencies.AddRange(mod.ModuleDependencies);
-                        }
+                        modules.Add(moduleDependencies[i], mod);
+                        moduleDependencies.AddRange(mod.ModuleDependencies);
                     }
-
-                    // Then compile everything
-                    var finalModules = new List<ModuleSyntax>(modules.Count + 1);
-                    finalModules.Add(mainModule);
-                    finalModules.AddRange(modules.Values);
-                    CompiledProgram program = legacyCompiler ? CompileLegacy(finalModules) : CompileOptimized(finalModules, optimize);
-                    if (program == null)
-                        return null;
-
-                    var outputPath = Path.GetFileNameWithoutExtension(filename) + ".cpeisik";
-                    using (var writer = new BinaryWriter(new FileStream(outputPath, FileMode.Create)))
-                    {
-                        program.Serialize(writer);
-                    }
-                    return program;
                 }
+
+                var finalModules = new List<ModuleSyntax>(modules.Count + 1);
+                finalModules.Add(mainModule);
+                finalModules.AddRange(modules.Values);
+                return finalModules;
             }
-            catch (IOException e)
-            {
-                Console.WriteLine(e.Message);
+        }
+
+        private static CompiledProgram CompilePeisik(string filename, List<ModuleSyntax> modules, bool legacyCompiler, bool optimize)
+        {
+            CompiledProgram program = legacyCompiler ? CompileLegacy(modules) : CompileOptimized(modules, optimize);
+            if (program == null)
                 return null;
+
+            var outputPath = Path.GetFileNameWithoutExtension(filename) + ".cpeisik";
+            using (var writer = new BinaryWriter(new FileStream(outputPath, FileMode.Create)))
+            {
+                program.Serialize(writer);
             }
+            return program;
         }
 
         private static CompiledProgram CompileLegacy(List<ModuleSyntax> finalModules)
@@ -175,6 +207,33 @@ namespace Polsys.PeisikFrontend
 
             PrintDiagnostics(compilerDiags);
             return program;
+        }
+
+        private static bool CompileX64(string filename, List<ModuleSyntax> modules, bool optimize, bool disasm)
+        {
+            var optimizations = optimize ? Optimization.Full : Optimization.None;
+            var compiler = new OptimizingCompiler(modules, optimizations);
+
+            var outputPath = Path.GetFileNameWithoutExtension(filename);
+            using (var exeWriter = new BinaryWriter(new FileStream(outputPath + ".exe", FileMode.Create)))
+            {
+                if (disasm)
+                {
+                    using (var asmWriter = new StreamWriter(new FileStream(outputPath + ".asm", FileMode.Create)))
+                    {
+                        var compilerDiags = compiler.CompileX64(exeWriter, asmWriter);
+                        PrintDiagnostics(compilerDiags);
+                    }
+                }
+                else
+                {
+                    var compilerDiags = compiler.CompileX64(exeWriter, null);
+                    PrintDiagnostics(compilerDiags);
+                }
+
+                // HACK: If the stream has not been used, the compilation failed
+                return exeWriter.BaseStream.Position != 0;
+            }
         }
 
         private static void DisassembleModule(CompiledProgram module)

@@ -49,6 +49,7 @@
     <Compile Include="Compiler\CompiledConstant.cs" />
     <Compile Include="Compiler\CompiledProgram.cs" />
     <Compile Include="Compiler\InternalFunctions.cs" />
+    <Compile Include="Compiler\Optimizing\CodeGeneratorX64.cs" />
     <Compile Include="Compiler\Optimizing\ConstantExpression.cs" />
     <Compile Include="Compiler\Optimizing\FunctionCallExpression.cs" />
     <Compile Include="Compiler\Optimizing\LocalLoadExpression.cs" />
@@ -70,6 +71,7 @@
     <Compile Include="Compiler\Optimizing\FailFastExpression.cs" />
     <Compile Include="Compiler\Optimizing\PrintExpression.cs" />
     <Compile Include="Compiler\Optimizing\UnaryExpression.cs" />
+    <Compile Include="Compiler\Optimizing\X64RegisterBackend.cs" />
     <Compile Include="Compiler\SemanticCompiler.cs" />
     <Compile Include="Parser\AssignmentSyntax.cs" />
     <Compile Include="Parser\IfSyntax.cs" />

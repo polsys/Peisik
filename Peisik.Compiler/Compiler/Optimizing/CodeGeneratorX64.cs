@@ -13,7 +13,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         private const int BaseOfCode = 0x00001000; // Relative to image base
         private int _sizeOfCodeSection;
         private int _sizeOfImage;
-        private int _addressOfEntryPoint;
+        private int _entryPointPosition;
 
         public CodeGeneratorX64(BinaryWriter exeWriter, StreamWriter debugWriter)
         {
@@ -71,26 +71,155 @@ namespace Polsys.Peisik.Compiler.Optimizing
             // EMIT PHASE
 
             // Emit the function header
-            PadStreamTo16ByteBoundary();
-            DisasmFunctionHeader(function, stackSize, _exeWriter.BaseStream.Position);
+            PadFunctionTo16ByteBoundary();
+            DisasmFunctionHeader(function, stackSize);
+
+            // If this is the main function, save it as the entry point
+            if (function.FullName == "main")
+            {
+                _entryPointPosition = (int)_exeWriter.BaseStream.Position;
+            }
 
             // Emit the expression tree
-            _exeWriter.Write(0xDEADBEEF);
+            GenerateExpression(function.ExpressionTree);
         }
 
-        private void PadStreamTo16ByteBoundary()
+        private void GenerateExpression(Expression expr)
+        {
+            switch (expr)
+            {
+                case ReturnExpression ret:
+                    GenerateReturn(ret);
+                    break;
+                default:
+                    throw new NotImplementedException($"Unimplemented expression: {expr}");
+            }
+        }
+
+        private void GenerateReturn(ReturnExpression ret)
+        {
+            if (ret.Value is ConstantExpression c)
+            {
+                if (c.Type == PrimitiveType.Real)
+                {
+                    EmitConstantLoad(c.Value, X64Register.Xmm0);
+                    EmitRet();
+                }
+                else
+                {
+                    EmitConstantLoad(c.Value, X64Register.Rax);
+                    EmitRet();
+                }
+            }
+            else
+            {
+                throw new NotImplementedException("ReturnExpression with unimplemented type");
+            }
+        }
+
+        private void EmitConstantLoad(object value, X64Register register)
+        {
+            if (value is long || value is bool)
+            {
+                var valueBits = Convert.ToInt64(value);
+
+                // Load an immediate into the general purpose register
+                DisasmInstruction($"mov {register.ToString().ToLower()}, 0x{valueBits:x8}");
+
+                (byte encodedReg, bool needB) = GetRegisterEncoding(register);
+                EmitRexPrefix(true, false, false, needB);
+                _exeWriter.Write((byte)(0xB8 | encodedReg)); // mov [reg]
+                _exeWriter.Write(valueBits);
+            }
+            else if (value is double d)
+            {
+                var valueBits = BitConverter.DoubleToInt64Bits(d);
+
+                // There is no instruction to load an immediate into an XMM register.
+                // Load the immediate into RAX and move it from there.
+                DisasmInstruction($"mov rax, 0x{valueBits:x8}");
+
+                (byte encodedRax, bool _) = GetRegisterEncoding(X64Register.Rax);
+                EmitRexPrefix(true, false, false, false);
+                _exeWriter.Write((byte)(0xB8 | encodedRax)); // mov eax
+                _exeWriter.Write(valueBits);
+
+                DisasmInstruction($"movq {register.ToString().ToLower()}, rax");
+
+                (byte encodedXmm, bool needR) = GetRegisterEncoding(register);
+                _exeWriter.Write((byte)0x66);
+                EmitRexPrefix(true, needR, false, false);
+                _exeWriter.Write((byte)0x0F);
+                _exeWriter.Write((byte)0x6E);
+                EmitModRMForRegisterToRegister(encodedXmm, encodedRax);
+            }
+        }
+
+        private void EmitRet()
+        {
+            DisasmInstruction("ret");
+            _exeWriter.Write(0xC3);
+        }
+
+        private void EmitRexPrefix(bool w, bool r, bool x, bool b)
+        {
+            byte rex = 0b_0100_0000;
+            if (w)
+                rex |= 0b_0000_1000;
+            if (r)
+                rex |= 0b_0000_0100;
+            if (x)
+                rex |= 0b_0000_0010;
+            if (b)
+                rex |= 0b_0000_0001;
+
+            _exeWriter.Write(rex);
+        }
+
+        private void EmitModRMForRegisterToRegister(byte dest, byte source)
+        {
+            byte modrm = 0b_11_000_000;
+            modrm |= (byte)(dest << 3);
+            modrm |= source;
+
+            _exeWriter.Write(modrm);
+        }
+
+        private (byte register, bool rex) GetRegisterEncoding(X64Register register)
+        {
+            switch (register)
+            {
+                case X64Register.Rax: return (0, false);
+                case X64Register.Rbx: return (3, false);
+                case X64Register.Rcx: return (1, false);
+                case X64Register.Rdx: return (2, false);
+                case X64Register.Xmm0: return (0, false);
+                default:
+                    throw new NotImplementedException("Register encoding not implemented");
+            }
+        }
+
+        private void PadFunctionTo16ByteBoundary()
         {
             var padLength = (16 - (_exeWriter.BaseStream.Position % 16)) % 16;
             var buffer = new byte[padLength];
+
+            // Since this padding is between functions, use a break opcode
+            for (var i = 0; i < padLength; i++)
+                buffer[i] = 0xCC;
+
             _exeWriter.Write(buffer);
         }
 
-        private void DisasmFunctionHeader(Function function, int stackSize, long position)
+        private void DisasmFunctionHeader(Function function, int stackSize)
         {
             if (_debugWriter != null)
                 _debugWriter.WriteLine();
 
-            DisasmComment($"Function '{function.FullName}' at 0x{(int)position:x8}");
+            var position = (int)_exeWriter.BaseStream.Position;
+            var virtualPosition = position - SizeOfHeaderSection + BaseOfCode + ImageBase;
+
+            DisasmComment($"Function '{function.FullName}' at 0x{position:x8} (in memory: 0x{virtualPosition:x8})");
             DisasmComment($"Stack size {stackSize} (0x{stackSize:x})");
             DisasmComment("Local variables:");
             foreach (var local in function.Locals)
@@ -107,6 +236,14 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 _debugWriter.Write("; ");
                 _debugWriter.WriteLine(content);
+            }
+        }
+
+        private void DisasmInstruction(string content)
+        {
+            if (_debugWriter != null)
+            {
+                _debugWriter.WriteLine($"{_exeWriter.BaseStream.Position:x8}: {content}");
             }
         }
 
@@ -145,7 +282,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             _exeWriter.Write((ushort)0x4c01); // ... 0x4c01
             _exeWriter.Write((ushort)0x21cd); // int 0x21 (ax=4c01h, terminate program)
             _exeWriter.Write(System.Text.Encoding.ASCII.GetBytes("This program requires MS-DOS Ultimate (x64)."));
-            _exeWriter.Write((uint)0x0a0d0d2e); // End of string, I presume?
+            _exeWriter.Write((uint)0x240a0d0d); // End of string
             _exeWriter.Write((ushort)0x0000); // Padding
 
             // COFF header (at 0x80)
@@ -168,7 +305,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
             _exeWriter.Write(_sizeOfCodeSection); // Size of code
             _exeWriter.Write(0); // Size of initialized data
             _exeWriter.Write(0); // Size of uninitialized data
-            _exeWriter.Write(_addressOfEntryPoint + BaseOfCode - SizeOfHeaderSection); // Entry point, relative to image base
+            _exeWriter.Write(_entryPointPosition + BaseOfCode - SizeOfHeaderSection); // Entry point, relative to image base
             _exeWriter.Write(BaseOfCode); // Base of code
 
             // Image header - Windows-specific fields
@@ -182,13 +319,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
             _exeWriter.Write((ushort)0x06); // Major subsystem version
             _exeWriter.Write((ushort)0x00); // Minor subsystem version
             _exeWriter.Write(0); // Reserved
-            _exeWriter.Write(_sizeOfImage); // Total size of image
+            // Total size of image when mapped in memory.
+            // This must be a multiple of the section alignment.
+            // NOTE: Must be kept in sync with section sizes!
+            _exeWriter.Write(RoundUpToPageSize(SizeOfHeaderSection) + RoundUpToPageSize(_sizeOfCodeSection));
             _exeWriter.Write(SizeOfHeaderSection); // Total size of headers
             _exeWriter.Write(0); // Checksum - not used
             _exeWriter.Write((ushort)0x0003); // Subsystem: Windows console
             // DLL characteristics:
             // 0x0100 NX_COMPAT
             // 0x0400 NO_SEH
+            // 0x8000 TERMINAL_SERVER_AWARE
+            //
+            // NOTE: We explicitly do not support dynamic base address!
+            // A more serious compiler must support relocations. 
             _exeWriter.Write((ushort)0b_0000_0101_0000_0000);
             _exeWriter.Write((ulong)0x00000000_00100000); // Stack reserve: 1 MB
             _exeWriter.Write((ulong)0x00000000_00001000); // Stack commit: 64 KB
@@ -199,6 +343,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
             // RVAs
             // TODO: Need to add an entry for import table and import address table
+            //       Also add a section and update the image size
             for (var i = 0; i < 16; i++)
                 _exeWriter.Write((ulong)0);
 
@@ -217,6 +362,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
             // 0x20000000 MEM_EXECUTE
             // 0x40000000 MEM_READ
             _exeWriter.Write((ulong)0x6000_0020);
+        }
+
+        private int RoundUpToPageSize(int size)
+        {
+            return (size + (4096 - (size % 4096)));
         }
     }
 }

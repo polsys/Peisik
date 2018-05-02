@@ -66,7 +66,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             if (location < -1)
             {
-                if (location <= (int)X64Register.FloatingPointStart)
+                if (location <= (int)X64Register.Xmm0)
                 {
                     _freeSseRegisters.Push((X64Register)location);
                 }
@@ -111,10 +111,6 @@ namespace Polsys.Peisik.Compiler.Optimizing
         R13 = -15,
         R14 = -16,
         R15 = -17,
-        /// <summary>
-        /// All register indices below this are floating-point registers.
-        /// </summary>
-        FloatingPointStart = -20,
         /// <summary>
         /// Reserved as a temporary register.
         /// </summary>

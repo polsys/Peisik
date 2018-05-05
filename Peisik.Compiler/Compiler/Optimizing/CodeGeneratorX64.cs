@@ -12,8 +12,12 @@ namespace Polsys.Peisik.Compiler.Optimizing
         private const int ImageBase = 0x00400000;
         private const int BaseOfCode = 0x00001000; // Relative to image base
         private int _sizeOfCodeSection;
+        private int _unpaddedSizeOfCodeSection;
         private int _sizeOfImage;
         private int _entryPointPosition;
+
+        // Because passing parameters is annoying
+        private int _currentStackSize;
 
         public CodeGeneratorX64(BinaryWriter exeWriter, StreamWriter debugWriter)
         {
@@ -37,6 +41,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
         public void FinalizeOutput()
         {
             // Pad the .text section to a 512-byte boundary
+            _unpaddedSizeOfCodeSection = (int)_exeWriter.BaseStream.Position - SizeOfHeaderSection;
             var bytesToPad = (512 - (_exeWriter.BaseStream.Position % 512)) % 512;
             for (var i = 0; i < bytesToPad; i++)
                 _exeWriter.Write((byte)0);
@@ -63,10 +68,17 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
             // Linearize the function: store results of operations in locals
             function.ExpressionTree.FoldSingleUseLocals();
+
             // TODO TODO TODO: Long expression chains will fail without linearization
 
             // Perform register allocation
-            var stackSize = RegisterAllocator<X64RegisterBackend>.Allocate(function);
+            // Each stack variable uses 8 bytes
+            var stackSize = RegisterAllocator<X64RegisterBackend>.Allocate(function) * 8;
+            _currentStackSize = stackSize;
+
+            // TODO: X64 calling convention requires callers to reserve stack space for spilling
+            // parameters passed in registers.
+            // Not only do this but also take advantage of the already-reserved space!
 
             // EMIT PHASE
 
@@ -80,6 +92,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 _entryPointPosition = (int)_exeWriter.BaseStream.Position;
             }
 
+            // Reserve space for stack locals
+            // The space is freed in EmitRet
+            EmitReserveStack(stackSize);
+
             // Emit the expression tree
             GenerateExpression(function.ExpressionTree);
         }
@@ -88,8 +104,15 @@ namespace Polsys.Peisik.Compiler.Optimizing
         {
             switch (expr)
             {
+                case ConstantExpression constant:
+                    EmitConstantLoad(constant.Value, constant.Store.StorageLocation);
+                    break;
                 case ReturnExpression ret:
                     GenerateReturn(ret);
+                    break;
+                case SequenceExpression sequence:
+                    foreach (var e in sequence.Expressions)
+                        GenerateExpression(e);
                     break;
                 default:
                     throw new NotImplementedException($"Unimplemented expression: {expr}");
@@ -102,29 +125,56 @@ namespace Polsys.Peisik.Compiler.Optimizing
             {
                 if (c.Type == PrimitiveType.Real)
                 {
-                    EmitConstantLoad(c.Value, X64Register.Xmm0);
-                    EmitRet();
+                    EmitConstantLoadIntoRegister(c.Value, X64Register.Xmm0);
                 }
                 else
                 {
-                    EmitConstantLoad(c.Value, X64Register.Rax);
-                    EmitRet();
+                    EmitConstantLoadIntoRegister(c.Value, X64Register.Rax);
+                }
+            }
+            else if (ret.Value is LocalLoadExpression local)
+            {
+                if (local.Type == PrimitiveType.Real)
+                {
+                    EmitMoveIntoRegister(local.Local.StorageLocation, X64Register.Xmm0);
+                }
+                else
+                {
+                    EmitMoveIntoRegister(local.Local.StorageLocation, X64Register.Rax);
                 }
             }
             else
             {
                 throw new NotImplementedException("ReturnExpression with unimplemented type");
             }
+
+            EmitRet();
         }
 
-        private void EmitConstantLoad(object value, X64Register register)
+        private void EmitConstantLoad(object value, int location)
+        {
+            if (location == (int)X64Register.Invalid)
+                throw new InvalidOperationException("No location assigned");
+
+            if (location < 0)
+            {
+                EmitConstantLoadIntoRegister(value, (X64Register)location);
+            }
+            else
+            {
+                EmitConstantLoadIntoRegister(value, X64Register.Rax);
+                EmitMoveOntoStack(X64Register.Rax, location);
+            }
+        }
+
+        private void EmitConstantLoadIntoRegister(object value, X64Register register)
         {
             if (value is long || value is bool)
             {
                 var valueBits = Convert.ToInt64(value);
 
                 // Load an immediate into the general purpose register
-                DisasmInstruction($"mov {register.ToString().ToLower()}, 0x{valueBits:x8}");
+                DisasmInstruction($"mov {register.ToString().ToLower()}, {valueBits:x}h");
 
                 (byte encodedReg, bool needB) = GetRegisterEncoding(register);
                 EmitRexPrefix(true, false, false, needB);
@@ -137,12 +187,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
                 // There is no instruction to load an immediate into an XMM register.
                 // Load the immediate into RAX and move it from there.
-                DisasmInstruction($"mov rax, 0x{valueBits:x8}");
+                DisasmInstruction($"mov rax, {valueBits:x}h  ; {d}");
 
                 (byte encodedRax, bool _) = GetRegisterEncoding(X64Register.Rax);
                 EmitRexPrefix(true, false, false, false);
                 _exeWriter.Write((byte)(0xB8 | encodedRax)); // mov eax
                 _exeWriter.Write(valueBits);
+
+                // In case of constant load onto stack, RAX is used as a temporary register
+                // There is then no need to move the value from RAX to RAX, especially considering the next point...
+                if (register == X64Register.Rax)
+                    return;
+
+                if (register > X64Register.Xmm0)
+                    throw new InvalidOperationException("Trying to load a double into a general-purpose register (not RAX).");
 
                 DisasmInstruction($"movq {register.ToString().ToLower()}, rax");
 
@@ -155,10 +213,157 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
         }
 
+        private void EmitMoveIntoRegister(int sourceLocation, X64Register dest)
+        {
+            if (sourceLocation < 0)
+            {
+                // Register to register
+                if ((sourceLocation <= (int)X64Register.Xmm0) != (dest <= X64Register.Xmm0))
+                {
+                    // This case only applies to EmitConstantLoadIntoRegister().
+                    // If you can prove me (probably you, three months ago) wrong, please refactor!
+                    throw new NotImplementedException("Moving between XMM and general purpose registers");
+                }
+                else if (dest > X64Register.Xmm0)
+                {
+                    // Moving into a general purpose register
+                    DisasmInstruction($"mov {dest.ToString().ToLower()}, " +
+                        $"{((X64Register)sourceLocation).ToString().ToLower()}");
+
+                    (byte encodedDest, bool needR) = GetRegisterEncoding(dest);
+                    (byte encodedSrc, bool needB) = GetRegisterEncoding((X64Register)sourceLocation);
+
+                    EmitRexPrefix(true, needR, false, needB);
+                    _exeWriter.Write((byte)0x8B);
+                    EmitModRMForRegisterToRegister(encodedDest, encodedSrc);
+                }
+                else if (dest <= X64Register.Xmm0)
+                {
+                    // Moving into a SIMD register
+                    DisasmInstruction($"movsd {dest.ToString().ToLower()}, " +
+                        $"{((X64Register)sourceLocation).ToString().ToLower()}");
+
+                    (byte encodedDest, bool needR) = GetRegisterEncoding(dest);
+                    (byte encodedSrc, bool needB) = GetRegisterEncoding((X64Register)sourceLocation);
+                    if (needR || needB)
+                    {
+                        EmitRexPrefix(false, needR, false, needB);
+                    }
+                    _exeWriter.Write((byte)0xF2);
+                    _exeWriter.Write((byte)0x0F);
+                    _exeWriter.Write((byte)0x10);
+                    EmitModRMForRegisterToRegister(encodedDest, encodedSrc);
+                }
+            }
+            else
+            {
+                var offset = _currentStackSize - sourceLocation - 8;
+                if (offset > sbyte.MaxValue)
+                    throw new NotImplementedException("Too large stack offset");
+
+                if (dest > X64Register.Xmm0)
+                {
+                    // Moving from stack into a general purpose register
+                    // This is exactly the same as with EmitMoveOntoStack,
+                    // but with a (slightly) different opcode.
+                    
+                    DisasmInstruction($"mov {dest.ToString().ToLower()}, qword ptr [rsp+{offset:x}h]");
+
+                    (var dst, var needB) = GetRegisterEncoding(dest);
+
+                    EmitRexPrefix(true, false, false, needB);
+                    _exeWriter.Write((byte)0x8B);
+                    EmitModRMForSIBWithByteDisplacement(dst);
+                    _exeWriter.Write((byte)0x24); // SIB for [esp + 0 +]
+                    _exeWriter.Write((byte)offset);
+                }
+                else if (dest <= X64Register.Xmm0)
+                {
+                    // Moving from stack into an XMM register
+
+                    DisasmInstruction($"movsd {dest.ToString().ToLower()}, mmword ptr [rsp+{offset:x}h]");
+
+                    (var dst, var needB) = GetRegisterEncoding(dest);
+
+                    EmitRexPrefix(true, false, false, needB);
+                    _exeWriter.Write((byte)0xF2);
+                    _exeWriter.Write((byte)0x0F);
+                    _exeWriter.Write((byte)0x10);
+                    EmitModRMForSIBWithByteDisplacement(dst);
+                    _exeWriter.Write((byte)0x24); // SIB for [esp + 0 +]
+                    _exeWriter.Write((byte)offset);
+                }
+            }
+        }
+
+        private void EmitMoveOntoStack(X64Register source, int dest)
+        {
+            if ((int)source >= -1)
+                throw new NotImplementedException("Moving within stack");
+            
+            // On x64 the stack grows downwards.
+            // So if we have three variables on stack and want to access the second one,
+            // we use [rsp + sizeof(variable)].
+            var offset = _currentStackSize - dest - 8;
+            if (offset > sbyte.MaxValue)
+                throw new NotImplementedException("Too large stack offset");
+
+            if (source < X64Register.Xmm0)
+            {
+                throw new NotImplementedException("Moving from XMM to stack");
+            }
+            else
+            {
+                DisasmInstruction($"mov qword ptr [rsp+{offset:x}h], {source.ToString().ToLower()}");
+
+                (var src, var needB) = GetRegisterEncoding(source);
+
+                EmitRexPrefix(true, false, false, needB);
+                _exeWriter.Write((byte)0x89);
+                EmitModRMForSIBWithByteDisplacement(src);
+                _exeWriter.Write((byte)0x24); // SIB for [esp + 0 +]
+                _exeWriter.Write((byte)offset);
+            }
+        }
+
+        private void EmitReserveStack(int stackSize)
+        {
+            if (stackSize == 0)
+                return;
+            if (stackSize > sbyte.MaxValue)
+                throw new NotImplementedException("Stack too big!");
+
+            DisasmInstruction($"sub rsp, {stackSize:x}h");
+
+            (var rsp, var needB) = GetRegisterEncoding(X64Register.Rsp);
+            EmitRexPrefix(true, false, false, needB);
+            _exeWriter.Write((byte)0x83);
+            EmitModRMForRegisterToRegister(5, rsp); // 5 is part of instruction encoding
+            _exeWriter.Write((byte)stackSize);
+        }
+
+        private void EmitFreeStack(int stackSize)
+        {
+            if (stackSize == 0)
+                return;
+            if (stackSize > sbyte.MaxValue)
+                throw new NotImplementedException("Stack too big!");
+
+            DisasmInstruction($"add rsp, {stackSize:x}h");
+
+            (var rsp, var needB) = GetRegisterEncoding(X64Register.Rsp);
+            EmitRexPrefix(true, false, false, needB);
+            _exeWriter.Write((byte)0x83);
+            EmitModRMForRegisterToRegister(0, rsp); // 0 is part of instruction encoding
+            _exeWriter.Write((byte)stackSize);
+        }
+
         private void EmitRet()
         {
+            EmitFreeStack(_currentStackSize);
+
             DisasmInstruction("ret");
-            _exeWriter.Write(0xC3);
+            _exeWriter.Write((byte)0xC3);
         }
 
         private void EmitRexPrefix(bool w, bool r, bool x, bool b)
@@ -185,15 +390,42 @@ namespace Polsys.Peisik.Compiler.Optimizing
             _exeWriter.Write(modrm);
         }
 
+        private void EmitModRMForSIBWithByteDisplacement(byte dest)
+        {
+            byte modrm = 0b_01_000_100;
+            modrm |= (byte)(dest << 3);
+
+            _exeWriter.Write(modrm);
+        }
+
         private (byte register, bool rex) GetRegisterEncoding(X64Register register)
         {
             switch (register)
             {
                 case X64Register.Rax: return (0, false);
-                case X64Register.Rbx: return (3, false);
                 case X64Register.Rcx: return (1, false);
                 case X64Register.Rdx: return (2, false);
+                case X64Register.Rbx: return (3, false);
+                case X64Register.Rsp: return (4, false);
+                case X64Register.Rbp: return (5, false);
+                case X64Register.Rsi: return (6, false);
+                case X64Register.Rdi: return (7, false);
+                case X64Register.R8: return (0, true);
+                case X64Register.R9: return (1, true);
+                case X64Register.R10: return (2, true);
+                case X64Register.R11: return (3, true);
+                case X64Register.R12: return (4, true);
+                case X64Register.R13: return (5, true);
+                case X64Register.R14: return (6, true);
+                case X64Register.R15: return (7, true);
                 case X64Register.Xmm0: return (0, false);
+                case X64Register.Xmm1: return (1, false);
+                case X64Register.Xmm2: return (2, false);
+                case X64Register.Xmm3: return (3, false);
+                case X64Register.Xmm4: return (4, false);
+                case X64Register.Xmm5: return (5, false);
+                case X64Register.Xmm6: return (6, false);
+                case X64Register.Xmm7: return (7, false);
                 default:
                     throw new NotImplementedException("Register encoding not implemented");
             }
@@ -225,8 +457,16 @@ namespace Polsys.Peisik.Compiler.Optimizing
             foreach (var local in function.Locals)
             {
                 if (local.StorageLocation < -1)
+                {
                     DisasmComment($"  {local.Name}  {(X64Register)local.StorageLocation}"
                         + $"  [{local.IntervalStart}, {local.IntervalEnd})");
+                }
+                else if (local.StorageLocation >= 0)
+                {
+                    DisasmComment($"  {local.Name}  [rsp+{stackSize - local.StorageLocation - 8:x}h]"
+                        + $"  [{local.IntervalStart}, {local.IntervalEnd})");
+                }
+                // If location is -1, the local is unused
             }
         }
 
@@ -349,7 +589,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
             // Section table entry for .text
             _exeWriter.Write((ulong)0x000000747865742e); // '.text\0\0\0'
-            _exeWriter.Write(_sizeOfCodeSection); // Virtual size - MSFT linker rounds up but we don't
+            _exeWriter.Write(_unpaddedSizeOfCodeSection); // Virtual size, no need to be a multiple of page size
             _exeWriter.Write(BaseOfCode); // Virtual address relative to image base
             _exeWriter.Write(_sizeOfCodeSection); // Size of raw data
             _exeWriter.Write(SizeOfHeaderSection); // Pointer to raw data - begins immediately after headers

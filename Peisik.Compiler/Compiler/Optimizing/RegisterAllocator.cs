@@ -60,6 +60,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 // Get a register for this interval
                 var location = backend.GetLocation(interval.Type, interval.IsParameter, out var onStack);
                 maxLocation = Math.Max(maxLocation, location);
+                interval.StorageLocation = location;
 
                 if (onStack && !interval.IsParameter)
                 {
@@ -84,17 +85,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
                             }
                             else
                             {
-                                // Spill this to stack
-                                interval.StorageLocation = location;
+                                // This should be left on stack
                                 break;
                             }
                         }
                     }
-                }
-                else
-                {
-                    // We got a register, woho!
-                    interval.StorageLocation = location;
                 }
 
                 // Add this interval to the active list and sort the list

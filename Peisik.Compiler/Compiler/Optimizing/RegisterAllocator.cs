@@ -121,6 +121,9 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 case BinaryExpression binary:
                     currentPosition = VisitTreeNode(binary.Left, currentPosition);
                     currentPosition = VisitTreeNode(binary.Right, currentPosition);
+                    // The x64 backend requires the child nodes to stay alive until the expression is evaluated
+                    SetLiveness(binary.Left.Store, currentPosition);
+                    SetLiveness(binary.Right.Store, currentPosition);
                     SetLiveness(binary.Store, currentPosition);
                     return currentPosition + 1;
                 case ConstantExpression constant:
@@ -151,7 +154,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     }
                     return currentPosition;
                 case ReturnExpression ret:
-                    return VisitTreeNode(ret.Value, currentPosition) + 1;
+                    // If the child expression is complex, the x64 backend needs a register for it
+                    // In that case we must add a use
+                    currentPosition = VisitTreeNode(ret.Value, currentPosition);
+                    SetLiveness(ret.Value.Store, currentPosition);
+                    return currentPosition + 1;
                 case SequenceExpression sequence:
                     foreach (var expr in sequence.Expressions)
                     {

@@ -68,8 +68,7 @@ namespace Polsys.Peisik.Compiler.Optimizing
 
             // Linearize the function: store results of operations in locals
             function.ExpressionTree.FoldSingleUseLocals();
-
-            // TODO TODO TODO: Long expression chains will fail without linearization
+            AddTemporaryStores(function, function.ExpressionTree);
 
             // Perform register allocation
             // Each stack variable uses 8 bytes
@@ -100,12 +99,85 @@ namespace Polsys.Peisik.Compiler.Optimizing
             GenerateExpression(function.ExpressionTree);
         }
 
+        private void AddTemporaryStores(Function function, Expression expression)
+        {
+            // The Peisik bytecode interpreter uses an execution stack.
+            // The x64 backend uses processor registers.
+            // Therefore the expression tree needs to be fixed to store all intermediate values on
+            // local variables.
+
+            // Handle this expression
+            if (expression.Store == null
+                && expression.Type != PrimitiveType.NoType
+                && expression.Type != PrimitiveType.Void)
+            {
+                if (expression is LocalLoadExpression)
+                {
+                    // As the code generator is only interested *where* the result is stored,
+                    // we can and should set Store to equal the local storage location.
+                    expression.Store = ((LocalLoadExpression)expression).Local;
+                }
+                else
+                {
+                    // Otherwise, generate a temporary variable to hold the value
+                    var temp = new LocalVariable(expression.Type, "$CodeGenTemp");
+                    function.Locals.Add(temp);
+                    expression.Store = temp;
+                }
+            }
+
+            // Handle children
+            switch (expression)
+            {
+                case BinaryExpression binary:
+                    AddTemporaryStores(function, binary.Left);
+                    AddTemporaryStores(function, binary.Right);
+                    break;
+                case FunctionCallExpression call:
+                    foreach (var expr in call.Parameters)
+                    {
+                        AddTemporaryStores(function, expr);
+                    }
+                    break;
+                case IfExpression condition:
+                    AddTemporaryStores(function, condition.Condition);
+                    AddTemporaryStores(function, condition.ThenExpression);
+                    AddTemporaryStores(function, condition.ElseExpression);
+                    break;
+                case ReturnExpression ret:
+                    AddTemporaryStores(function, ret.Value);
+                    break;
+                case SequenceExpression sequence:
+                    foreach (var expr in sequence.Expressions)
+                    {
+                        AddTemporaryStores(function, expr);
+                    }
+                    break;
+                case UnaryExpression unary:
+                    AddTemporaryStores(function, unary.Expression);
+                    break;
+                case WhileExpression loop:
+                    AddTemporaryStores(function, loop.Condition);
+                    AddTemporaryStores(function, loop.Body);
+                    break;
+                default:
+                    break; // Not all nodes have children
+            }
+        }
+
         private void GenerateExpression(Expression expr)
         {
             switch (expr)
             {
+                case BinaryExpression binary:
+                    GenerateBinaryExpression(binary);
+                    break;
                 case ConstantExpression constant:
                     EmitConstantLoad(constant.Value, constant.Store.StorageLocation);
+                    break;
+                case LocalLoadExpression _:
+                    // Local loads on x64 are simple: they are already there.
+                    // No execution stack to push them into.
                     break;
                 case ReturnExpression ret:
                     GenerateReturn(ret);
@@ -116,6 +188,130 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     break;
                 default:
                     throw new NotImplementedException($"Unimplemented expression: {expr}");
+            }
+        }
+
+        private void GenerateBinaryExpression(BinaryExpression expr)
+        {
+            switch (expr.InternalFunctionId)
+            {
+                case InternalFunction.Plus:
+                case InternalFunction.Minus:
+                    GenerateArithmeticBinaryExpression(expr);
+                    break;
+                default:
+                    throw new NotImplementedException("Unimplemented binary expression");
+            }
+        }
+
+        private void GenerateArithmeticBinaryExpression(BinaryExpression expr)
+        {
+            if (expr.Left.Store.StorageLocation == -1 || expr.Right.Store.StorageLocation == -1)
+                throw new InvalidOperationException("Operands have no storage specified");
+
+            // Generate the left and right expressions
+            GenerateExpression(expr.Left);
+            GenerateExpression(expr.Right);
+
+            // Ensure that the operands are in registers
+            // Either operand should be moved to the destination register because of x86 convention
+            if (expr.Store.StorageLocation >= -1)
+                throw new NotImplementedException("Storing binary expression result on stack");
+            var destRegister = (X64Register)expr.Store.StorageLocation;
+            var otherRegister = X64Register.Invalid;
+
+            if (expr.Left.Store.StorageLocation >= 0 && expr.Right.Store.StorageLocation >= 0)
+            {
+                throw new NotImplementedException("Both operands on stack");
+            }
+            else if (expr.Left.Store.StorageLocation >= 0)
+            {
+                if (expr.Right.Store.StorageLocation == (int)destRegister)
+                {
+                    // Right is already in the destination register, left is moved to temp
+                    otherRegister = EmitMoveIntoTempRegister(expr.Left.Store);
+                }
+                else
+                {
+                    // Move left from stack to destination, right is in another register
+                    EmitMoveIntoRegister(expr.Left.Store.StorageLocation, destRegister);
+                    otherRegister = (X64Register)expr.Right.Store.StorageLocation;
+                }
+            }
+            else if (expr.Right.Store.StorageLocation >= 0)
+            {
+                if (expr.Left.Store.StorageLocation == (int)destRegister)
+                {
+                    // Left is already in the destination register, right is moved to temp
+                    otherRegister = EmitMoveIntoTempRegister(expr.Right.Store);
+                }
+                else
+                {
+                    // Move right from stack to destination, left is in another register
+                    EmitMoveIntoRegister(expr.Right.Store.StorageLocation, destRegister);
+                    otherRegister = (X64Register)expr.Left.Store.StorageLocation;
+                }
+            }
+            else
+            {
+                // Both operands are in registers
+                if (expr.Left.Store.StorageLocation == (int)destRegister)
+                {
+                    // Left is already in the correct place
+                    otherRegister = (X64Register)expr.Right.Store.StorageLocation;
+                }
+                else if (expr.Right.Store.StorageLocation == (int)destRegister)
+                {
+                    // Right is already in the correct place
+                    otherRegister = (X64Register)expr.Left.Store.StorageLocation;
+                }
+                else
+                {
+                    // Move left into destination register, keep right where it is
+                    EmitMoveIntoRegister(expr.Left.Store.StorageLocation, destRegister);
+                    otherRegister = (X64Register)expr.Right.Store.StorageLocation;
+                }
+            }
+
+            // Disassembly for the operation
+            switch (expr.InternalFunctionId)
+            {
+                case InternalFunction.Plus:
+                    DisasmInstruction($"add {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
+                    break;
+                case InternalFunction.Minus:
+                    DisasmInstruction($"sub {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
+                    break;
+                default:
+                    throw new NotImplementedException("Unimplemented disassembly for binary operation");
+            }
+
+            // Emit the operation
+            if (expr.Type == PrimitiveType.Int)
+            {
+                // Everything happens in general purpose registers
+                (var dest, var needR) = GetRegisterEncoding(destRegister);
+                (var src, var needB) = GetRegisterEncoding(otherRegister);
+
+                EmitRexPrefix(true, needR, false, needB);
+
+                switch (expr.InternalFunctionId)
+                {
+                    case InternalFunction.Plus:
+                        _exeWriter.Write((byte)0x03);
+                        break;
+                    case InternalFunction.Minus:
+                        _exeWriter.Write((byte)0x2B);
+                        break;
+                    default:
+                        throw new NotImplementedException("Unimplemented general-purpose binary operation");
+                }
+
+                EmitModRMForRegisterToRegister(dest, src);
+            }
+            else
+            {
+                throw new NotImplementedException("Unimplemented result type for binary expression");
             }
         }
 
@@ -132,20 +328,17 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     EmitConstantLoadIntoRegister(c.Value, X64Register.Rax);
                 }
             }
-            else if (ret.Value is LocalLoadExpression local)
+            else
             {
-                if (local.Type == PrimitiveType.Real)
+                GenerateExpression(ret.Value);
+                if (ret.Value.Type == PrimitiveType.Real)
                 {
-                    EmitMoveIntoRegister(local.Local.StorageLocation, X64Register.Xmm0);
+                    EmitMoveIntoRegister(ret.Value.Store.StorageLocation, X64Register.Xmm0);
                 }
                 else
                 {
-                    EmitMoveIntoRegister(local.Local.StorageLocation, X64Register.Rax);
+                    EmitMoveIntoRegister(ret.Value.Store.StorageLocation, X64Register.Rax);
                 }
-            }
-            else
-            {
-                throw new NotImplementedException("ReturnExpression with unimplemented type");
             }
 
             EmitRet();
@@ -293,6 +486,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     _exeWriter.Write((byte)0x24); // SIB for [esp + 0 +]
                     _exeWriter.Write((byte)offset);
                 }
+            }
+        }
+
+        private X64Register EmitMoveIntoTempRegister(LocalVariable store)
+        {
+            if (store.Type == PrimitiveType.Real)
+            {
+                EmitMoveIntoRegister(store.StorageLocation, X64Register.Xmm0);
+                return X64Register.Xmm0;
+            }
+            else
+            {
+                EmitMoveIntoRegister(store.StorageLocation, X64Register.Rax);
+                return X64Register.Rax;
             }
         }
 

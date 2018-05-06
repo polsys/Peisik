@@ -130,6 +130,20 @@ namespace Polsys.Peisik.Compiler.Optimizing
             switch (expression)
             {
                 case BinaryExpression binary:
+                    // Special case: some binary expressions accept mixed reals and ints as parameters,
+                    // or integers are implicitly converted to reals. In that case we add a conversion
+                    // operation in between, and therefore allocate a floating-point temporary.
+                    if (binary.Type == PrimitiveType.Real)
+                    {
+                        // This violates immutability of the expression tree.
+                        // Shame on me!
+                        if (binary.Left.Type == PrimitiveType.Int)
+                            binary.Left = new RealConversionExpression(binary.Left);
+                        if (binary.Right.Type == PrimitiveType.Int)
+                            binary.Right = new RealConversionExpression(binary.Right);
+                    }
+
+                    // Then back into business as usual
                     AddTemporaryStores(function, binary.Left);
                     AddTemporaryStores(function, binary.Right);
                     break;
@@ -143,6 +157,9 @@ namespace Polsys.Peisik.Compiler.Optimizing
                     AddTemporaryStores(function, condition.Condition);
                     AddTemporaryStores(function, condition.ThenExpression);
                     AddTemporaryStores(function, condition.ElseExpression);
+                    break;
+                case RealConversionExpression real:
+                    AddTemporaryStores(function, real.Expression);
                     break;
                 case ReturnExpression ret:
                     AddTemporaryStores(function, ret.Value);
@@ -178,6 +195,9 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 case LocalLoadExpression _:
                     // Local loads on x64 are simple: they are already there.
                     // No execution stack to push them into.
+                    break;
+                case RealConversionExpression real:
+                    GenerateIntToRealConversion(real);
                     break;
                 case ReturnExpression ret:
                     GenerateReturn(ret);
@@ -273,22 +293,21 @@ namespace Polsys.Peisik.Compiler.Optimizing
                 }
             }
 
-            // Disassembly for the operation
-            switch (expr.InternalFunctionId)
-            {
-                case InternalFunction.Plus:
-                    DisasmInstruction($"add {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
-                    break;
-                case InternalFunction.Minus:
-                    DisasmInstruction($"sub {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
-                    break;
-                default:
-                    throw new NotImplementedException("Unimplemented disassembly for binary operation");
-            }
-
             // Emit the operation
             if (expr.Type == PrimitiveType.Int)
             {
+                switch (expr.InternalFunctionId)
+                {
+                    case InternalFunction.Plus:
+                        DisasmInstruction($"add {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
+                        break;
+                    case InternalFunction.Minus:
+                        DisasmInstruction($"sub {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
+                        break;
+                    default:
+                        throw new NotImplementedException("Unimplemented disassembly for binary operation");
+                }
+
                 // Everything happens in general purpose registers
                 (var dest, var needR) = GetRegisterEncoding(destRegister);
                 (var src, var needB) = GetRegisterEncoding(otherRegister);
@@ -311,8 +330,69 @@ namespace Polsys.Peisik.Compiler.Optimizing
             }
             else
             {
-                throw new NotImplementedException("Unimplemented result type for binary expression");
+                switch (expr.InternalFunctionId)
+                {
+                    case InternalFunction.Plus:
+                        DisasmInstruction($"addsd {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
+                        break;
+                    case InternalFunction.Minus:
+                        DisasmInstruction($"subsd {destRegister.ToString().ToLower()}, {otherRegister.ToString().ToLower()}");
+                        break;
+                    default:
+                        throw new NotImplementedException("Unimplemented disassembly for binary operation");
+                }
+
+                // Everything happens in XMM registers
+                (var dest, var needR) = GetRegisterEncoding(destRegister);
+                (var src, var needB) = GetRegisterEncoding(otherRegister);
+
+                // REX is not by default part of instruction encoding, as the operand size is always 64 bits
+                if (needR || needB)
+                    throw new NotImplementedException("REX prefix for double arithmetic");
+
+                switch (expr.InternalFunctionId)
+                {
+                    case InternalFunction.Plus:
+                        _exeWriter.Write((byte)0xF2);
+                        _exeWriter.Write((byte)0x0F);
+                        _exeWriter.Write((byte)0x58);
+                        break;
+                    case InternalFunction.Minus:
+                        _exeWriter.Write((byte)0xF2);
+                        _exeWriter.Write((byte)0x0F);
+                        _exeWriter.Write((byte)0x5C);
+                        break;
+                    default:
+                        throw new NotImplementedException("Unimplemented floating-point binary operation");
+                }
+
+                EmitModRMForRegisterToRegister(dest, src);
             }
+        }
+
+        private void GenerateIntToRealConversion(RealConversionExpression real)
+        {
+            // Generate the integer expression
+            GenerateExpression(real.Expression);
+
+            // Emit a conversion
+            if (real.Expression.Store.StorageLocation >= -1)
+                throw new NotImplementedException("Int->Real conversion with source on stack");
+            if (real.Store.StorageLocation >= -1)
+                throw new NotImplementedException("Int->Real conversion with destination on stack");
+            var destRegister = (X64Register)real.Store.StorageLocation;
+            var srcRegister = (X64Register)real.Expression.Store.StorageLocation;
+
+            DisasmInstruction($"cvtsi2sd {destRegister.ToString().ToLower()}, {srcRegister.ToString().ToLower()}");
+
+            (var dest, var needR) = GetRegisterEncoding(destRegister);
+            (var src, var needB) = GetRegisterEncoding(srcRegister);
+
+            _exeWriter.Write((byte)0xF2);
+            EmitRexPrefix(true, needR, false, needB);
+            _exeWriter.Write((byte)0x0F);
+            _exeWriter.Write((byte)0x2A);
+            EmitModRMForRegisterToRegister(dest, src);
         }
 
         private void GenerateReturn(ReturnExpression ret)

@@ -153,6 +153,11 @@ namespace Polsys.Peisik.Compiler.Optimizing
                         currentPosition = VisitTreeNode(expr, currentPosition);
                     }
                     return currentPosition;
+                case RealConversionExpression real:
+                    currentPosition = VisitTreeNode(real.Expression, currentPosition);
+                    SetLiveness(real.Expression.Store, currentPosition);
+                    SetLiveness(real.Store, currentPosition);
+                    return currentPosition + 1;
                 case ReturnExpression ret:
                     // If the child expression is complex, the x64 backend needs a register for it
                     // In that case we must add a use

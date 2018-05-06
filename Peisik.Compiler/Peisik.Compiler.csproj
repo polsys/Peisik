@@ -51,6 +51,7 @@
     <Compile Include="Compiler\InternalFunctions.cs" />
     <Compile Include="Compiler\Optimizing\CodeGeneratorX64.cs" />
     <Compile Include="Compiler\Optimizing\ConstantExpression.cs" />
+    <Compile Include="Compiler\Optimizing\RealConversionExpression.cs" />
     <Compile Include="Compiler\Optimizing\FunctionCallExpression.cs" />
     <Compile Include="Compiler\Optimizing\LocalLoadExpression.cs" />
     <Compile Include="Compiler\Optimizing\PeisikRegisterBackend.cs" />

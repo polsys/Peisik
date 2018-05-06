@@ -7,8 +7,10 @@ namespace Polsys.Peisik.Compiler.Optimizing
     /// </summary>
     internal class BinaryExpression : Expression
     {
-        public Expression Left { get; private set; }
-        public Expression Right { get; private set; }
+        // NOTE: The x64 code generator is allowed an immutability violation,
+        //       because it may need to promote integer parameters to reals.
+        public Expression Left { get; internal set; }
+        public Expression Right { get; internal set; }
 
         public InternalFunction InternalFunctionId => _internalFunction.Index;
         private InternalFunctionDefinition _internalFunction;
